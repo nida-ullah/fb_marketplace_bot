@@ -1,0 +1,47 @@
+{% extends "base.html" %} {% block content %}
+<div class="container mt-4">
+  <div class="d-flex justify-content-between align-items-center mb-4">
+    <h2>Marketplace Posts</h2>
+    <a href="{% url 'create_post' %}" class="btn btn-primary"
+      >Create New Post</a
+    >
+  </div>
+
+  <div class="table-responsive">
+    <table class="table table-striped">
+      <thead>
+        <tr>
+          <th>Title</th>
+          <th>Account</th>
+          <th>Price</th>
+          <th>Location</th>
+          <th>Scheduled Time</th>
+          <th>Status</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for post in posts %}
+        <tr>
+          <td>{{ post.title }}</td>
+          <td>{{ post.account.email }}</td>
+          <td>${{ post.price }}</td>
+          <td>{{ post.location }}</td>
+          <td>{{ post.scheduled_time }}</td>
+          <td>
+            {% if post.posted %}
+            <span class="badge bg-success">Posted</span>
+            {% else %}
+            <span class="badge bg-warning">Pending</span>
+            {% endif %}
+          </td>
+        </tr>
+        {% empty %}
+        <tr>
+          <td colspan="6" class="text-center">No posts found.</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}
