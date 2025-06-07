@@ -10,9 +10,6 @@ __pycache__/
 *.pyzwz
 *.pyzwzw
 
-sessions/
-media/
-staticfiles/
 
 .env
 .env.local
