@@ -20,11 +20,10 @@ def save_session(email):
         browser.close()
 
 
-def login_and_post(email, title, description, price, image_path, location):
+def login_and_post(email, title, description, price, image_path, category=None, condition='new', availability='in_stock', public_meetup=False, door_pickup=False, door_dropoff=False, brand='', color='', sku='', tags=''):
     session_file = f"sessions/{email.replace('@', '_').replace('.', '_')}.json"
     if not os.path.exists(session_file):
-        raise Exception(
-            f"❌ Session not found. Run save_session('{email}') first.")
+        raise Exception(f"❌ Session not found. Run save_session('{email}') first.")
 
     with sync_playwright() as p:
         browser = p.chromium.launch(headless=False)
@@ -32,44 +31,33 @@ def login_and_post(email, title, description, price, image_path, location):
         page = context.new_page()
 
         print("🌐 Opening Marketplace listing page...")
-        page.goto("https://www.facebook.com/marketplace/create/item",
-                  timeout=60000)
+        page.goto("https://www.facebook.com/marketplace/create/item", timeout=60000)
 
         try:
             print("📸 Uploading image first...")
             image_input = page.locator("input[type='file'][accept*='image']")
             image_input.set_input_files(image_path)
-            page.wait_for_timeout(2000)  # Wait for UI to update after upload
+            page.wait_for_timeout(2000)
 
             print("📝 Filling Title...")
-            # Find all visible text inputs that are empty and not in the header
             text_inputs = page.locator("input[type='text']")
             title_input = None
 
             for i in range(text_inputs.count()):
                 el = text_inputs.nth(i)
-                # Check if visible and empty
                 if el.is_visible() and el.input_value() == "":
-                    # Optionally, skip if it's in the header (search bar)
-                    # You can check its position on the page
                     box = el.bounding_box()
-                    if box and box['y'] > 100:  # Skip inputs at the very top
+                    if box and box['y'] > 100:
                         title_input = el
                         break
 
             if not title_input:
-                all_inputs = page.locator("input")
-                print(
-                    f"Found {all_inputs.count()} input fields. Printing their outerHTML:")
-                for i in range(all_inputs.count()):
-                    print(all_inputs.nth(i).evaluate("el => el.outerHTML"))
                 raise Exception("Could not find title input field")
 
             title_input.fill(title)
+            page.wait_for_timeout(10000)  # Wait 10 seconds for Facebook to process the title
 
             print("💰 Filling Price...")
-
-            # Find all text inputs again
             text_inputs = page.locator("input[type='text']")
             price_input = None
             title_filled = False
@@ -77,64 +65,124 @@ def login_and_post(email, title, description, price, image_path, location):
             for i in range(text_inputs.count()):
                 el = text_inputs.nth(i)
                 if el.is_visible():
-                    # If this is the title input, mark as found
                     if not title_filled and el.input_value() == title:
                         title_filled = True
                         continue
-                    # The next visible, empty input after title is likely the price
                     if title_filled and el.input_value() == "":
                         price_input = el
                         break
 
             if not price_input:
-                print(
-                    "Could not find price input. Printing all text input values for debug:")
-                for i in range(text_inputs.count()):
-                    el = text_inputs.nth(i)
-                    print(
-                        f"Input {i}: value='{el.input_value()}', visible={el.is_visible()}")
                 raise Exception("Could not find price input field")
 
             price_input.fill(str(price))
+            page.wait_for_timeout(5000)  # Wait 5 seconds for Facebook to process the price
 
-            print("📂 Selecting Category...")
-            # Find all elements with the text "Category"
-            category_elements = page.locator("text=Category")
-            for i in range(category_elements.count()):
-                el = category_elements.nth(i)
-                if el.is_visible():
-                    el.scroll_into_view_if_needed()
-                    el.click(force=True)
-                    break
-            page.wait_for_timeout(1000)
-            page.keyboard.press("ArrowDown")
-            page.keyboard.press("Enter")
+            # Only try to select category if one was specified
+            if category:
+                print("📂 Selecting Category...")
+                category_elements = page.locator("text=Category")
+                category_clicked = False
+                for i in range(category_elements.count()):
+                    el = category_elements.nth(i)
+                    if el.is_visible():
+                        el.scroll_into_view_if_needed()
+                        el.click(force=True)
+                        category_clicked = True
+                        break
+                
+                if category_clicked:
+                    page.wait_for_timeout(2000)
+                    
+                    # Get the main category from the category code
+                    main_category = category.split('_')[0].title()
+                    subcategory = ' '.join(category.split('_')[1:]).title()
+                    
+                    # First select the main category
+                    max_attempts = 20
+                    found_main = False
+                    for _ in range(max_attempts):
+                        page.keyboard.press("ArrowDown")
+                        page.wait_for_timeout(500)
+                        selected_text = page.evaluate("() => document.activeElement.textContent")
+                        if main_category in selected_text:
+                            page.keyboard.press("Enter")
+                            found_main = True
+                            break
+                    
+                    if found_main:
+                        page.wait_for_timeout(2000)
+                        # Now select the subcategory
+                        for _ in range(max_attempts):
+                            page.keyboard.press("ArrowDown")
+                            page.wait_for_timeout(500)
+                            selected_text = page.evaluate("() => document.activeElement.textContent")
+                            if subcategory in selected_text:
+                                page.keyboard.press("Enter")
+                                break
+                    else:
+                        print(f"Warning: Could not find main category {main_category}")
+            else:
+                print("ℹ️ No category specified - letting Facebook auto-detect based on title and description")
+                page.wait_for_timeout(5000)  # Wait for auto-detection
 
             print("🔧 Selecting Condition...")
             condition_elements = page.locator("text=Condition")
+            condition_found = False
             for i in range(condition_elements.count()):
                 el = condition_elements.nth(i)
                 if el.is_visible():
                     el.scroll_into_view_if_needed()
                     el.click(force=True)
+                    condition_found = True
                     break
-            page.wait_for_timeout(1000)
-            page.keyboard.press("ArrowDown")
-            page.keyboard.press("Enter")
+            
+            if not condition_found:
+                print("Warning: Could not find condition selector")
+            else:
+                page.wait_for_timeout(2000)
+                
+                # Map our condition values to Facebook's exact text
+                condition_map = {
+                    'new': 'New',
+                    'used_like_new': 'Used - Like New',
+                    'used_good': 'Used - Good',
+                    'used_fair': 'Used - Fair'
+                }
+                
+                # Select the appropriate condition
+                condition_text = condition_map.get(condition, '')
+                if condition_text:
+                    for _ in range(10):  # Increased attempts to find condition
+                        page.keyboard.press("ArrowDown")
+                        page.wait_for_timeout(500)
+                        selected_text = page.evaluate("() => document.activeElement.textContent")
+                        if condition_text in selected_text:
+                            page.keyboard.press("Enter")
+                            break
 
             print("🧾 Filling Description...")
             try:
-                # Try by accessible name
-                description_area = page.get_by_role(
-                    "textbox", name="Description")
-                description_area.fill(description)
+                description_area = page.get_by_role("textbox", name="Description")
+                # Enhanced description with additional details
+                enhanced_description = f"{description}\n\n"
+                if brand:
+                    enhanced_description += f"Brand: {brand}\n"
+                if color:
+                    enhanced_description += f"Color: {color}\n"
+                if sku:
+                    enhanced_description += f"SKU: {sku}\n"
+                if tags:
+                    enhanced_description += f"Tags: {tags}\n"
+                
+                description_area.fill(enhanced_description)
+                page.wait_for_timeout(2000)  # Wait for Facebook to process the description
             except Exception:
-                # Fallback: use the first visible textarea
                 textareas = page.locator("textarea")
                 for i in range(textareas.count()):
                     el = textareas.nth(i)
                     if el.is_visible():
-                        el.fill(description)
+                        el.fill(enhanced_description)
                         break
 
             print("📦 Selecting Availability...")
@@ -146,41 +194,46 @@ def login_and_post(email, title, description, price, image_path, location):
                     el.click(force=True)
                     break
             page.wait_for_timeout(1000)
-            page.keyboard.press("ArrowDown")
+            
+            # Select the appropriate availability option
+            if availability == 'in_stock':
+                page.keyboard.press("ArrowDown")
             page.keyboard.press("Enter")
 
-            print("📍 Filling Location...")
-            location_input = page.locator("input[aria-label='Location']")
-            location_input.fill("Toronto, Ontario")  # Use the correct location
-            page.wait_for_timeout(2000)  # Let suggestions load
-
-            # Try to select the first suggestion from the dropdown
-            try:
-                page.keyboard.press("ArrowDown")
-                page.keyboard.press("Enter")
-                print("Selected first location suggestion.")
-            except Exception:
-                print(
-                    "Could not select location suggestion, please check location input.")
-            page.wait_for_timeout(1000)
-
-            print("☑️ Selecting Meetup Preference (if required)...")
-            # Try to check the first visible checkbox or radio button after location
-            checkboxes = page.locator(
-                "input[type='checkbox'], input[type='radio']")
-            checked = False
-            for i in range(checkboxes.count()):
-                el = checkboxes.nth(i)
-                if el.is_visible() and not el.is_checked():
-                    el.scroll_into_view_if_needed()
-                    el.check(force=True)
-                    checked = True
-                    print("Checked a meetup preference option.")
-                    break
-            if not checked:
-                print(
-                    "No visible meetup preference checkbox/radio found or already checked.")
-            page.wait_for_timeout(1000)
+            print("☑️ Selecting Meetup Preferences...")
+            # Wait for meetup preferences to be visible
+            page.wait_for_timeout(2000)
+            
+            # Select each enabled meetup preference
+            if public_meetup:
+                meetup_element = page.locator("text=Public Meetup").first
+                if meetup_element.is_visible():
+                    meetup_element.click(force=True)
+                    page.wait_for_timeout(1000)
+                    # Verify selection
+                    if not meetup_element.is_checked():
+                        meetup_element.click(force=True)
+                        page.wait_for_timeout(1000)
+            
+            if door_pickup:
+                meetup_element = page.locator("text=Door Pickup").first
+                if meetup_element.is_visible():
+                    meetup_element.click(force=True)
+                    page.wait_for_timeout(1000)
+                    # Verify selection
+                    if not meetup_element.is_checked():
+                        meetup_element.click(force=True)
+                        page.wait_for_timeout(1000)
+            
+            if door_dropoff:
+                meetup_element = page.locator("text=Door Drop Off").first
+                if meetup_element.is_visible():
+                    meetup_element.click(force=True)
+                    page.wait_for_timeout(1000)
+                    # Verify selection
+                    if not meetup_element.is_checked():
+                        meetup_element.click(force=True)
+                        page.wait_for_timeout(1000)
 
             print("📤 Publishing...")
             page.click("text='Next'")

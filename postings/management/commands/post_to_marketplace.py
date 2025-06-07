@@ -41,7 +41,16 @@ class Command(BaseCommand):
                     description=post.description,
                     price=float(post.price),
                     image_path=image_path,
-                    location=post.location
+                    category=post.category,
+                    condition=post.condition,
+                    availability=post.availability,
+                    public_meetup=post.public_meetup,
+                    door_pickup=post.door_pickup,
+                    door_dropoff=post.door_dropoff,
+                    brand=post.brand,
+                    color=post.color,
+                    sku=post.sku,
+                    tags=post.tags
                 )
 
                 # Mark as posted

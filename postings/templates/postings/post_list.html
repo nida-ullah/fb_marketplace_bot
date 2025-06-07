@@ -14,7 +14,8 @@
           <th>Title</th>
           <th>Account</th>
           <th>Price</th>
-          <th>Location</th>
+          <th>Category</th>
+          <th>Meetup Options</th>
           <th>Scheduled Time</th>
           <th>Status</th>
         </tr>
@@ -25,7 +26,12 @@
           <td>{{ post.title }}</td>
           <td>{{ post.account.email }}</td>
           <td>${{ post.price }}</td>
-          <td>{{ post.location }}</td>
+          <td>{{ post.get_category_display }}</td>
+          <td>
+            {% if post.public_meetup %}Public Meetup{% endif %}
+            {% if post.door_pickup %}{% if post.public_meetup %}, {% endif %}Door Pickup{% endif %}
+            {% if post.door_dropoff %}{% if post.public_meetup or post.door_pickup %}, {% endif %}Door Drop Off{% endif %}
+          </td>
           <td>{{ post.scheduled_time }}</td>
           <td>
             {% if post.posted %}
@@ -37,7 +43,7 @@
         </tr>
         {% empty %}
         <tr>
-          <td colspan="6" class="text-center">No posts found.</td>
+          <td colspan="7" class="text-center">No posts found.</td>
         </tr>
         {% endfor %}
       </tbody>
