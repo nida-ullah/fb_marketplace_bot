@@ -20,7 +20,8 @@ def save_session(email):
         browser.close()
 
 
-def login_and_post(email, title, description, price, image_path, location):
+# def login_and_post(email, title, description, price, image_path, location):
+def login_and_post(email, title, description, price, image_path):
     session_file = f"sessions/{email.replace('@', '_').replace('.', '_')}.json"
     if not os.path.exists(session_file):
         raise Exception(
@@ -96,9 +97,10 @@ def login_and_post(email, title, description, price, image_path, location):
                 raise Exception("Could not find price input field")
 
             price_input.fill(str(price))
+            # page.locator("text=Category").first.wait_for(
+            # state="visible", timeout=10000)
 
             print("📂 Selecting Category...")
-            # Find all elements with the text "Category"
             category_elements = page.locator("text=Category")
             for i in range(category_elements.count()):
                 el = category_elements.nth(i)
@@ -106,9 +108,17 @@ def login_and_post(email, title, description, price, image_path, location):
                     el.scroll_into_view_if_needed()
                     el.click(force=True)
                     break
+
             page.wait_for_timeout(1000)
-            page.keyboard.press("ArrowDown")
-            page.keyboard.press("Enter")
+
+            # Click the exact "Furniture" option
+            furniture_option = page.locator("text=Furniture")
+            if furniture_option.first.is_visible():
+                furniture_option.first.scroll_into_view_if_needed()
+                furniture_option.first.click(force=True)
+                print("✅ Selected Category: Furniture")
+            else:
+                print("❌ Could not find Furniture category.")
 
             print("🔧 Selecting Condition...")
             condition_elements = page.locator("text=Condition")
@@ -118,9 +128,17 @@ def login_and_post(email, title, description, price, image_path, location):
                     el.scroll_into_view_if_needed()
                     el.click(force=True)
                     break
+
             page.wait_for_timeout(1000)
-            page.keyboard.press("ArrowDown")
-            page.keyboard.press("Enter")
+
+            # Click the exact "New" condition
+            new_option = page.locator("text=New")
+            if new_option.first.is_visible():
+                new_option.first.scroll_into_view_if_needed()
+                new_option.first.click(force=True)
+                print("✅ Selected Condition: New")
+            else:
+                print("❌ Could not find New condition.")
 
             print("🧾 Filling Description...")
             try:
@@ -137,7 +155,8 @@ def login_and_post(email, title, description, price, image_path, location):
                         el.fill(description)
                         break
 
-            print("📦 Selecting Availability...")
+            print("📦 Setting Availability: In Stock...")
+
             availability_elements = page.locator("text=List as in Stock")
             for i in range(availability_elements.count()):
                 el = availability_elements.nth(i)
@@ -146,45 +165,14 @@ def login_and_post(email, title, description, price, image_path, location):
                     el.click(force=True)
                     break
             page.wait_for_timeout(1000)
-            page.keyboard.press("ArrowDown")
+            page.keyboard.press("Home")  # Go to top of availability list
+            page.keyboard.press("ArrowDown")  # Navigate to "In Stock"
             page.keyboard.press("Enter")
 
-            print("📍 Filling Location...")
-            location_input = page.locator("input[aria-label='Location']")
-            location_input.fill("Toronto, Ontario")  # Use the correct location
-            page.wait_for_timeout(2000)  # Let suggestions load
-
-            # Try to select the first suggestion from the dropdown
-            try:
-                page.keyboard.press("ArrowDown")
-                page.keyboard.press("Enter")
-                print("Selected first location suggestion.")
-            except Exception:
-                print(
-                    "Could not select location suggestion, please check location input.")
-            page.wait_for_timeout(1000)
-
-            print("☑️ Selecting Meetup Preference (if required)...")
-            # Try to check the first visible checkbox or radio button after location
-            checkboxes = page.locator(
-                "input[type='checkbox'], input[type='radio']")
-            checked = False
-            for i in range(checkboxes.count()):
-                el = checkboxes.nth(i)
-                if el.is_visible() and not el.is_checked():
-                    el.scroll_into_view_if_needed()
-                    el.check(force=True)
-                    checked = True
-                    print("Checked a meetup preference option.")
-                    break
-            if not checked:
-                print(
-                    "No visible meetup preference checkbox/radio found or already checked.")
-            page.wait_for_timeout(1000)
+            print("📍 Skipping location (using proxy/VPN for region)...")
 
             print("📤 Publishing...")
             page.click("text='Next'")
-            page.wait_for_timeout(2000)
             page.click("text='Publish'")
 
             print("✅ Posted successfully!")
@@ -198,108 +186,3 @@ def login_and_post(email, title, description, price, image_path, location):
         finally:
             context.close()
             browser.close()
-
-# def login_and_post(email, title, description, price, image_path, location):
-#     with sync_playwright() as p:
-#         browser = p.chromium.launch(headless=False)
-#         context = browser.new_context()
-#         page = context.new_page()
-
-#         print("🌐 Logging into Facebook...")
-#         page.goto("https://www.facebook.com/marketplace/create/item")
-
-#         # Login (reuse cookies/session if you have it)
-#         page.fill("input[name='email']", email)
-#         page.fill("input[name='pass']", "your_password")  # Replace securely
-#         page.click("button[name='login']")
-#         page.wait_for_timeout(5000)  # Wait for login to complete
-
-#         print("📸 Uploading image...")
-#         image_input = page.locator("input[type='file']")
-#         image_input.set_input_files(image_path)
-#         page.wait_for_timeout(5000)  # Let FB process the image
-
-#         print("📝 Filling title...")
-#         page.locator("input[placeholder='Title']").wait_for()
-#         page.fill("input[placeholder='Title']", title)
-
-#         print("💰 Filling price...")
-#         page.fill("input[placeholder='Price']", str(price))
-
-#         print("📂 Selecting category...")
-#         page.locator("text=Category").click()
-#         page.keyboard.press("ArrowDown")
-#         page.keyboard.press("Enter")  # Select first category
-
-#         print("🔧 Selecting condition...")
-#         page.locator("text=Condition").click()
-#         page.keyboard.press("ArrowDown")
-#         page.keyboard.press("Enter")  # Select first condition
-
-#         print("🧾 Filling description...")
-#         page.fill("textarea", description)
-
-#         print("📦 Selecting availability...")
-#         page.locator("text=List as in Stock").click()
-#         page.keyboard.press("ArrowDown")
-#         page.keyboard.press("Enter")
-
-#         print("📍 Filling location...")
-#         location_input = page.locator("input[aria-label='Location']")
-#         location_input.fill(location)
-#         page.wait_for_timeout(2000)
-#         page.keyboard.press("ArrowDown")
-#         page.keyboard.press("Enter")
-
-#         print("📤 Publishing...")
-#         page.click("text='Next'")
-#         page.wait_for_timeout(2000)
-#         page.click("text='Publish'")
-
-#         print("✅ Listing posted successfully!")
-
-#         context.close()
-#         browser.close()
-
-
-# def login_and_post(email, title, description, price, image_path, location):
-#     session_file = f"sessions/{email.replace('@', '_').replace('.', '_')}.json"
-#     if not os.path.exists(session_file):
-#         raise Exception(
-#             f"❌ Session not found. Run save_session('{email}') first.")
-
-#     with sync_playwright() as p:
-#         browser = p.chromium.launch(headless=False)
-#         context = browser.new_context(storage_state=session_file)
-#         page = context.new_page()
-
-#         print("🌐 Opening Marketplace listing page...")
-#         page.goto("https://www.facebook.com/marketplace/create/item",
-#                   timeout=60000)
-
-#         try:
-#             # Try exact selector first
-#             title_input = page.locator("input[aria-label='Title']")
-#             if not title_input.is_visible():
-#                 print("❗ aria-label not found, using first input fallback...")
-#                 title_input = page.locator("input").first  # fallback
-
-#             title_input.wait_for(timeout=60000)
-#             title_input.fill(title)
-
-#             # Continue filling other fields
-#             page.locator("input[aria-label='Price']").fill(str(price))
-#             page.locator("textarea").fill(description)
-#             page.set_input_files("input[type='file']", image_path)
-#             page.locator("input[aria-label='Location']").fill(location)
-
-#             page.click("text='Next'")
-#             time.sleep(3)
-#             page.click("text='Publish'")
-#             print("✅ Posted successfully!")
-
-#         except Exception as e:
-#             print("❌ Something went wrong while trying to fill the form.")
-#             page.screenshot(path="error_screenshot.png")
-#             print("📷 Screenshot saved as error_screenshot.png")
-#             raise e

@@ -40,8 +40,8 @@ class Command(BaseCommand):
                     title=post.title,
                     description=post.description,
                     price=float(post.price),
-                    image_path=image_path,
-                    location=post.location
+                    image_path=image_path
+                    # location=post.location
                 )
 
                 # Mark as posted
