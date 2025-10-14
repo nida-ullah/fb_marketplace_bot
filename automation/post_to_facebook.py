@@ -3,6 +3,36 @@ import time
 import os
 
 
+def debug_page_state(page, step_name):
+    """Helper function to debug page state at any point"""
+    print(f"\n🔍 DEBUG: {step_name}")
+    print(f"   URL: {page.url}")
+    
+    # Check for error messages
+    errors = page.locator("[role='alert'], .error").all()
+    error_count = sum(1 for e in errors if e.is_visible())
+    if error_count > 0:
+        print(f"   ⚠️ Found {error_count} error message(s)")
+    
+    # Check for buttons
+    buttons = page.locator("button").all()
+    visible_buttons = []
+    for btn in buttons:
+        try:
+            if btn.is_visible():
+                text = btn.inner_text()[:50]  # Limit text length
+                if text.strip():
+                    visible_buttons.append(text.strip())
+        except Exception:
+            pass
+    
+    if visible_buttons:
+        print(f"   📍 Visible buttons: {', '.join(set(visible_buttons[:5]))}")  # Show first 5 unique
+    else:
+        print("   ⚠️ No visible buttons found")
+    print()
+
+
 def save_session(email):
     with sync_playwright() as p:
         browser = p.chromium.launch(headless=False)
@@ -275,10 +305,150 @@ def login_and_post(email, title, description, price, image_path):
 
             print("📍 Skipping location (using proxy/VPN for region)...")
 
-            print("📤 Publishing...")
-            page.click("text='Next'")
-            page.click("text='Publish'")
+            # Debug: Check page state after filling all fields
+            debug_page_state(page, "After filling all fields")
+            
+            # Check for any validation errors before proceeding
+            print("🔍 Checking for validation errors...")
+            page.wait_for_timeout(1000)
+            
+            # Look for error messages or required field indicators
+            error_indicators = page.locator("[role='alert'], .error, [aria-invalid='true']").all()
+            if error_indicators:
+                print("⚠️ Warning: Found potential validation errors on the page")
+                for i, indicator in enumerate(error_indicators):
+                    try:
+                        if indicator.is_visible():
+                            text = indicator.inner_text()
+                            print(f"  Error {i+1}: {text}")
+                    except Exception:
+                        pass
+            
+            # Scroll to bottom to ensure all fields are visible and validated
+            print("📜 Scrolling to bottom of form...")
+            page.evaluate("window.scrollTo(0, document.body.scrollHeight)")
+            page.wait_for_timeout(2000)
 
+            print("📤 Looking for Next button...")
+            next_clicked = False
+            
+            # Try multiple approaches to click Next button
+            # Approach 1: Text-based selector
+            try:
+                next_buttons = page.locator("text='Next'").all()
+                for btn in next_buttons:
+                    if btn.is_visible():
+                        btn.scroll_into_view_if_needed()
+                        btn.click()
+                        next_clicked = True
+                        print("✅ Clicked Next button (via text)")
+                        break
+            except Exception:
+                pass
+            
+            # Approach 2: Role-based selector
+            if not next_clicked:
+                try:
+                    next_btn = page.get_by_role("button", name="Next")
+                    if next_btn.is_visible():
+                        next_btn.click()
+                        next_clicked = True
+                        print("✅ Clicked Next button (via role)")
+                except Exception:
+                    pass
+            
+            # Approach 3: Try finding button with aria-label
+            if not next_clicked:
+                try:
+                    next_btn = page.locator("button[aria-label*='Next']").first
+                    if next_btn.is_visible():
+                        next_btn.click()
+                        next_clicked = True
+                        print("✅ Clicked Next button (via aria-label)")
+                except Exception:
+                    pass
+            
+            if not next_clicked:
+                print("⚠️ Could not find Next button - form might be single page, looking for Publish directly")
+            else:
+                # Wait for page transition after clicking Next
+                page.wait_for_timeout(3000)
+                print("⏳ Waiting for Publish button to appear...")
+            
+            # Debug: Check page state after Next button
+            debug_page_state(page, "After Next button (or if no Next button)")
+            
+            # Scroll to bottom again to reveal Publish button
+            page.evaluate("window.scrollTo(0, document.body.scrollHeight)")
+            page.wait_for_timeout(2000)
+            
+            print("🔍 Looking for Publish button...")
+            publish_clicked = False
+            
+            # Try multiple variations of the Publish button
+            publish_variations = [
+                "Publish",
+                "Publish listing",
+                "Post",
+                "Post listing",
+                "Confirm",
+                "Submit"
+            ]
+            
+            for variation in publish_variations:
+                if publish_clicked:
+                    break
+                    
+                # Try text-based selector
+                try:
+                    publish_buttons = page.locator(f"text='{variation}'").all()
+                    for btn in publish_buttons:
+                        if btn.is_visible():
+                            btn.scroll_into_view_if_needed()
+                            page.wait_for_timeout(1000)
+                            btn.click()
+                            publish_clicked = True
+                            print(f"✅ Clicked Publish button (found as '{variation}')")
+                            break
+                except Exception:
+                    pass
+                
+                # Try role-based selector
+                if not publish_clicked:
+                    try:
+                        publish_btn = page.get_by_role("button", name=variation)
+                        if publish_btn.is_visible():
+                            publish_btn.scroll_into_view_if_needed()
+                            page.wait_for_timeout(1000)
+                            publish_btn.click()
+                            publish_clicked = True
+                            print(f"✅ Clicked Publish button (role, found as '{variation}')")
+                            break
+                    except Exception:
+                        pass
+            
+            if not publish_clicked:
+                # Last resort: Take a screenshot and print all buttons for debugging
+                print("❌ Could not find Publish button!")
+                page.screenshot(path="publish_button_missing.png")
+                print("📷 Screenshot saved as publish_button_missing.png")
+                
+                # Print all visible buttons for debugging
+                print("\n🔍 DEBUG: All visible buttons on page:")
+                buttons = page.locator("button").all()
+                for i, btn in enumerate(buttons):
+                    try:
+                        if btn.is_visible():
+                            text = btn.inner_text()
+                            aria_label = btn.get_attribute("aria-label")
+                            print(f"  Button {i}: text='{text}', aria-label='{aria_label}'")
+                    except Exception:
+                        pass
+                
+                raise Exception("Publish button not found after multiple attempts")
+            
+            # Wait for posting to complete
+            page.wait_for_timeout(3000)
             print("✅ Posted successfully!")
 
         except Exception as e:
