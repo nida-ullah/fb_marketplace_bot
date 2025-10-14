@@ -33,21 +33,150 @@ def debug_page_state(page, step_name):
     print()
 
 
-def save_session(email):
+def save_session(email, password=None):
     with sync_playwright() as p:
         browser = p.chromium.launch(headless=False)
         context = browser.new_context()
         page = context.new_page()
-        page.goto("https://www.facebook.com/login")
+        page.goto("https://www.facebook.com/login", wait_until="domcontentloaded")
 
-        print(f"👉 Please log in manually for: {email}")
-        print("⏳ You have 60 seconds...")
-        time.sleep(60)
+        login_successful = False
 
+        if password:
+            print(f"🔐 Auto-logging in for: {email}")
+            
+            try:
+                page.fill('input[name="email"]', email)
+                page.fill('input[name="pass"]', password)
+                page.click('button[name="login"]')
+                
+                print("⏳ Waiting for login response...")
+                time.sleep(5)
+                
+                # Check if still on login page or error occurred
+                current_url = page.url
+                
+                # Check for various login failure indicators
+                is_still_login = (
+                    "login" in current_url or 
+                    page.locator('input[name="email"]').is_visible() or
+                    page.locator('input[name="pass"]').is_visible()
+                )
+                
+                # Check for checkpoint/captcha
+                is_checkpoint = (
+                    "checkpoint" in current_url or 
+                    "captcha" in current_url or
+                    page.locator('text=Security Check').is_visible() or
+                    page.locator('text=Enter the code').is_visible()
+                )
+                
+                if is_checkpoint:
+                    print("🔒 Captcha/2FA/Checkpoint detected!")
+                    print("👉 Please solve it manually in the browser...")
+                    print("⏳ Waiting 90 seconds for you to complete...")
+                    time.sleep(90)
+                    
+                    # Verify login after manual intervention
+                    current_url = page.url
+                    is_logged_in = (
+                        "facebook.com" in current_url and 
+                        "login" not in current_url and
+                        "checkpoint" not in current_url and
+                        not page.locator('input[name="email"]').is_visible()
+                    )
+                    
+                    if is_logged_in:
+                        login_successful = True
+                        print("✅ Login successful after solving checkpoint!")
+                    else:
+                        print("❌ Login still not completed - checkpoint not solved")
+                        
+                elif is_still_login:
+                    print("❌ Login failed - wrong password or blocked")
+                    
+                else:
+                    # Appears to be logged in
+                    login_successful = True
+                    print("✅ Auto-login successful!")
+                    
+            except Exception as e:
+                print(f"⚠️ Auto-login failed: {e}")
+                print("👉 Please log in manually")
+                time.sleep(60)
+                
+                # Check if manual login succeeded
+                try:
+                    current_url = page.url
+                    if "login" not in current_url and not page.locator('input[name="email"]').is_visible():
+                        login_successful = True
+                        print("✅ Manual login successful!")
+                except Exception:
+                    pass
+        else:
+            print(f"👉 Please log in manually for: {email}")
+            print("⏳ You have 60 seconds...")
+            time.sleep(60)
+            
+            # Check if manual login succeeded
+            try:
+                current_url = page.url
+                if "login" not in current_url and not page.locator('input[name="email"]').is_visible():
+                    login_successful = True
+                    print("✅ Manual login successful!")
+            except Exception:
+                pass
+
+        if login_successful:
+            session_path = f"sessions/{email.replace('@', '_').replace('.', '_')}.json"
+            context.storage_state(path=session_path)
+            print(f"✅ Session saved: {session_path}")
+        else:
+            print(f"❌ Session NOT saved - Login failed for {email}")
+            
+        browser.close()
+        return login_successful
+
+
+def auto_login_and_save_session(email, password):
+    """Automatically login to Facebook and save session"""
+    with sync_playwright() as p:
+        browser = p.chromium.launch(headless=False)
+        context = browser.new_context()
+        page = context.new_page()
+        
+        print(f"🌐 Opening Facebook login page...")
+        page.goto("https://www.facebook.com/login", timeout=60000)
+        page.wait_for_timeout(3000)
+        
+        print(f"📧 Entering email: {email}")
+        email_input = page.locator("input[name='email']")
+        email_input.fill(email)
+        
+        print(f"🔒 Entering password...")
+        password_input = page.locator("input[name='pass']")
+        password_input.fill(password)
+        
+        print(f"🔐 Clicking login button...")
+        login_button = page.locator("button[name='login']")
+        login_button.click()
+        
+        # Wait for login to complete
+        print(f"⏳ Waiting for login to complete...")
+        page.wait_for_timeout(10000)
+        
+        # Check if login was successful
+        if "login" in page.url.lower():
+            print(f"❌ Login may have failed - still on login page")
+            browser.close()
+            return False
+        
         session_path = f"sessions/{email.replace('@', '_').replace('.', '_')}.json"
         context.storage_state(path=session_path)
         print(f"✅ Session saved: {session_path}")
+        
         browser.close()
+        return True
 
 
 # def login_and_post(email, title, description, price, image_path, location):

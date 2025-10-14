@@ -1,0 +1,107 @@
+{% extends 'base.html' %} {% block content %}
+<div class="container mt-5">
+  <h2>Bulk Upload Facebook Accounts</h2>
+
+  {% if messages %} {% for message in messages %}
+  <div
+    class="alert alert-{{ message.tags }} alert-dismissible fade show"
+    role="alert"
+  >
+    {{ message }}
+    <button
+      type="button"
+      class="btn-close"
+      data-bs-dismiss="alert"
+      aria-label="Close"
+    ></button>
+  </div>
+  {% endfor %} {% endif %}
+
+  <div class="row">
+    <div class="col-md-6">
+      <div class="card">
+        <div class="card-body">
+          <h5 class="card-title">Upload Accounts File</h5>
+          <form method="post" enctype="multipart/form-data">
+            {% csrf_token %}
+            <div class="mb-3">
+              {{ form.file.label_tag }} {{ form.file }}
+              <div class="form-text">{{ form.file.help_text }}</div>
+            </div>
+            <button type="submit" class="btn btn-primary">
+              Upload & Process
+            </button>
+          </form>
+
+          <hr />
+
+          <h6>File Format:</h6>
+          <pre class="bg-light p-2">
+email1@example.com:password1
+email2@example.com:password2
+email3@example.com:password3</pre
+          >
+        </div>
+      </div>
+    </div>
+
+    <div class="col-md-6">
+      <div class="card">
+        <div class="card-body">
+          <h5 class="card-title">Accounts ({{ accounts.count }})</h5>
+          <div
+            class="table-responsive"
+            style="max-height: 400px; overflow-y: auto"
+          >
+            <table class="table table-sm">
+              <thead>
+                <tr>
+                  <th>Email</th>
+                  <th>Session</th>
+                  <th>Created</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for account in accounts %}
+                <tr>
+                  <td>{{ account.email }}</td>
+                  <td>
+                    {% if account.session_cookie %}
+                    <span class="badge bg-success">✓</span>
+                    {% else %}
+                    <span class="badge bg-secondary">-</span>
+                    {% endif %}
+                  </td>
+                  <td>{{ account.created_at|date:"M d, Y" }}</td>
+                </tr>
+                {% empty %}
+                <tr>
+                  <td colspan="3" class="text-center text-muted">
+                    No accounts yet
+                  </td>
+                </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="mt-4">
+    <div class="alert alert-info">
+      <h6>How it works:</h6>
+      <ol>
+        <li>Upload a .txt file with email:password pairs (one per line)</li>
+        <li>Accounts are saved to the database</li>
+        <li>
+          For each account without a session, a browser opens automatically
+        </li>
+        <li>Log in manually in each browser (60 seconds per account)</li>
+        <li>Sessions are saved automatically</li>
+      </ol>
+    </div>
+  </div>
+</div>
+{% endblock %}
