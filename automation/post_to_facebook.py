@@ -101,44 +101,116 @@ def login_and_post(email, title, description, price, image_path):
             # state="visible", timeout=10000)
 
             print("📂 Selecting Category...")
+            category_clicked = False
             category_elements = page.locator("text=Category")
             for i in range(category_elements.count()):
                 el = category_elements.nth(i)
                 if el.is_visible():
                     el.scroll_into_view_if_needed()
                     el.click(force=True)
+                    category_clicked = True
+                    print("✅ Clicked on Category dropdown")
                     break
 
-            page.wait_for_timeout(1000)
-
-            # Click the exact "Furniture" option
-            furniture_option = page.locator("text=Furniture")
-            if furniture_option.first.is_visible():
-                furniture_option.first.scroll_into_view_if_needed()
-                furniture_option.first.click(force=True)
-                print("✅ Selected Category: Furniture")
+            if not category_clicked:
+                print("❌ Could not find Category dropdown")
             else:
-                print("❌ Could not find Furniture category.")
+                # Wait for dropdown to fully open
+                page.wait_for_timeout(2000)
+
+                # Try to select "Furniture"
+                furniture_selected = False
+
+                # Approach 1: Try role-based selection
+                try:
+                    furniture_option = page.get_by_role(
+                        "option", name="Furniture")
+                    if furniture_option.is_visible():
+                        furniture_option.click()
+                        furniture_selected = True
+                        print("✅ Selected Category: Furniture (via role)")
+                except Exception:
+                    pass
+
+                # Approach 2: Try text locator
+                if not furniture_selected:
+                    try:
+                        furniture_options = page.locator(
+                            "text='Furniture'").all()
+                        for option in furniture_options:
+                            if option.is_visible():
+                                option.scroll_into_view_if_needed()
+                                option.click(force=True)
+                                furniture_selected = True
+                                print("✅ Selected Category: Furniture (via text)")
+                                break
+                    except Exception:
+                        pass
+
+                if not furniture_selected:
+                    print(
+                        "❌ Could not select Furniture category - trying to continue anyway")
 
             print("🔧 Selecting Condition...")
             condition_elements = page.locator("text=Condition")
+            condition_clicked = False
             for i in range(condition_elements.count()):
                 el = condition_elements.nth(i)
                 if el.is_visible():
                     el.scroll_into_view_if_needed()
                     el.click(force=True)
+                    condition_clicked = True
+                    print("✅ Clicked on Condition dropdown")
                     break
 
-            page.wait_for_timeout(1000)
-
-            # Click the exact "New" condition
-            new_option = page.locator("text=New")
-            if new_option.first.is_visible():
-                new_option.first.scroll_into_view_if_needed()
-                new_option.first.click(force=True)
-                print("✅ Selected Condition: New")
+            if not condition_clicked:
+                print("❌ Could not find Condition dropdown")
             else:
-                print("❌ Could not find New condition.")
+                # Wait for dropdown to fully open
+                page.wait_for_timeout(2000)
+
+                # Try multiple approaches to find and click "New" condition
+                new_clicked = False
+
+                # Approach 1: Try exact text match with role
+                try:
+                    new_option = page.get_by_role("option", name="New")
+                    if new_option.is_visible():
+                        new_option.click()
+                        new_clicked = True
+                        print("✅ Selected Condition: New (via role)")
+                except Exception:
+                    pass
+
+                # Approach 2: Try text locator with exact match
+                if not new_clicked:
+                    try:
+                        # Find all elements containing "New" and filter
+                        new_options = page.locator("text='New'").all()
+                        for option in new_options:
+                            if option.is_visible():
+                                option.scroll_into_view_if_needed()
+                                option.click(force=True)
+                                new_clicked = True
+                                print("✅ Selected Condition: New (via text)")
+                                break
+                    except Exception:
+                        pass
+
+                # Approach 3: Use keyboard navigation
+                if not new_clicked:
+                    try:
+                        page.keyboard.press("Home")  # Go to top
+                        page.keyboard.press("ArrowDown")  # Navigate to "New"
+                        page.keyboard.press("Enter")
+                        new_clicked = True
+                        print("✅ Selected Condition: New (via keyboard)")
+                    except Exception:
+                        pass
+
+                if not new_clicked:
+                    print(
+                        "❌ Could not select New condition - trying to continue anyway")
 
             print("🧾 Filling Description...")
             try:
@@ -157,17 +229,49 @@ def login_and_post(email, title, description, price, image_path):
 
             print("📦 Setting Availability: In Stock...")
 
+            availability_clicked = False
             availability_elements = page.locator("text=List as in Stock")
             for i in range(availability_elements.count()):
                 el = availability_elements.nth(i)
                 if el.is_visible():
                     el.scroll_into_view_if_needed()
                     el.click(force=True)
+                    availability_clicked = True
+                    print("✅ Clicked on Availability dropdown")
                     break
-            page.wait_for_timeout(1000)
-            page.keyboard.press("Home")  # Go to top of availability list
-            page.keyboard.press("ArrowDown")  # Navigate to "In Stock"
-            page.keyboard.press("Enter")
+
+            if availability_clicked:
+                page.wait_for_timeout(2000)
+
+                # Try to select "In Stock"
+                in_stock_set = False
+
+                # Approach 1: Try direct selection
+                try:
+                    in_stock_option = page.get_by_role(
+                        "option", name="In stock")
+                    if in_stock_option.is_visible():
+                        in_stock_option.click()
+                        in_stock_set = True
+                        print("✅ Set Availability: In Stock (via role)")
+                except Exception:
+                    pass
+
+                # Approach 2: Keyboard navigation
+                if not in_stock_set:
+                    try:
+                        page.keyboard.press("Home")
+                        page.keyboard.press("ArrowDown")
+                        page.keyboard.press("Enter")
+                        in_stock_set = True
+                        print("✅ Set Availability: In Stock (via keyboard)")
+                    except Exception:
+                        pass
+
+                if not in_stock_set:
+                    print("❌ Could not set availability - trying to continue anyway")
+            else:
+                print("❌ Could not find Availability dropdown")
 
             print("📍 Skipping location (using proxy/VPN for region)...")
 
