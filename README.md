@@ -8,6 +8,8 @@ Save Facebook sessions securely (manual login required only once).
 
 Upload and schedule Marketplace posts from Django admin.
 
+**📦 NEW: Ultra-Simple Bulk Upload** - CSV with just 3 columns (title, description, price)!
+
 Automatically reuse sessions to avoid repeated logins.
 
 Supports multiple accounts (future extensions possible).
@@ -63,10 +65,19 @@ After success, session file will be saved under sessions/.
 You only need to do this once per account.
 
 📝 Add Marketplace post
+
+**Option 1: Single Post**
 Go to Postings > Marketplace posts in admin.
 Add title, description, price, image, and select account.
 Set scheduled_time to now or any past date to post immediately.
 Save.
+
+**Option 2: Bulk Upload (NEW!) 📦 - SUPER SIMPLE**
+1. Create a CSV file with just 3 columns: `title,description,price`
+2. Visit `http://localhost:8000/bulk-upload/`
+3. Upload CSV - posts will be created instantly!
+4. Go to Django Admin to assign accounts and add images
+5. Run `python manage.py post_to_marketplace` to publish
 
 🚀 Post to Marketplace
 python manage.py post_to_marketplace

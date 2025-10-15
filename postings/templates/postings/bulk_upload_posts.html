@@ -1,0 +1,326 @@
+{% extends 'base.html' %} {% block title %}Bulk Upload Posts - FB Marketplace
+Bot{% endblock %} {% block content %}
+<div class="container mt-5">
+  <div class="row">
+    <div class="col-md-8 offset-md-2">
+      <div class="card shadow">
+        <div class="card-header bg-primary text-white">
+          <h3 class="mb-0">📦 Bulk Upload Posts via CSV</h3>
+        </div>
+        <div class="card-body">
+          {% if messages %} {% for message in messages %}
+          <div
+            class="alert alert-{{ message.tags }} alert-dismissible fade show"
+            role="alert"
+          >
+            {{ message|safe }}
+            <button
+              type="button"
+              class="btn-close"
+              data-bs-dismiss="alert"
+              aria-label="Close"
+            ></button>
+          </div>
+          {% endfor %} {% endif %}
+
+          <form method="post" enctype="multipart/form-data" id="bulkUploadForm">
+            {% csrf_token %}
+
+            <div class="mb-3">
+              <label class="form-label fw-bold">
+                Facebook Accounts
+                <span id="accountCount" class="badge bg-primary ms-2"
+                  >0 selected</span
+                >
+              </label>
+              <div class="border rounded p-3 bg-light">
+                <!-- Select All Checkbox -->
+                <div class="form-check mb-2 pb-2 border-bottom">
+                  <input
+                    class="form-check-input"
+                    type="checkbox"
+                    id="selectAllAccounts"
+                  />
+                  <label
+                    class="form-check-label fw-bold"
+                    for="selectAllAccounts"
+                  >
+                    ✅ Select All Accounts
+                  </label>
+                </div>
+
+                <!-- Individual Account Checkboxes -->
+                {% for account in form.accounts.field.queryset %}
+                <div class="form-check mb-2">
+                  <input
+                    class="form-check-input account-checkbox"
+                    type="checkbox"
+                    name="accounts"
+                    value="{{ account.pk }}"
+                    id="account_{{ account.pk }}"
+                  />
+                  <label
+                    class="form-check-label"
+                    for="account_{{ account.pk }}"
+                  >
+                    {{ account.email }}
+                  </label>
+                </div>
+                {% endfor %}
+              </div>
+              <div class="form-text">
+                Select one or more accounts. Posts will be distributed evenly
+                across selected accounts.
+              </div>
+              {% if form.accounts.errors %}
+              <div class="text-danger mt-2">{{ form.accounts.errors }}</div>
+              {% endif %}
+              <div
+                id="accountError"
+                class="text-danger mt-2"
+                style="display: none"
+              >
+                Please select at least one account.
+              </div>
+            </div>
+
+            <div class="mb-3">
+              {{ form.csv_file.label_tag }} {{ form.csv_file }}
+              <div class="form-text">{{ form.csv_file.help_text }}</div>
+              {% if form.csv_file.errors %}
+              <div class="text-danger">{{ form.csv_file.errors }}</div>
+              {% endif %}
+            </div>
+
+            <div class="d-grid gap-2">
+              <button type="submit" class="btn btn-primary btn-lg">
+                📤 Upload CSV
+              </button>
+              <a href="{% url 'post_list' %}" class="btn btn-secondary">
+                ← Back to Posts
+              </a>
+            </div>
+          </form>
+
+          <hr class="my-4" />
+
+          <div class="alert alert-warning">
+            <h5>🔄 How Posting Works:</h5>
+            <p class="mb-2">
+              <strong
+                >Each post from your CSV will be created for ALL selected
+                accounts.</strong
+              >
+            </p>
+            <div class="bg-white p-3 rounded border">
+              <strong>Example:</strong><br />
+              CSV has 3 posts: iPhone, TV, Laptop<br />
+              You select 3 accounts: Account A, B, C<br />
+              <br />
+              <strong>Result = 9 total posts:</strong><br />
+              • Account A: iPhone, TV, Laptop<br />
+              • Account B: iPhone, TV, Laptop<br />
+              • Account C: iPhone, TV, Laptop<br />
+            </div>
+          </div>
+
+          <div class="alert alert-info">
+            <h5>📋 CSV Format Instructions:</h5>
+            <p class="mb-2">
+              Your CSV file can include 3 required columns + 1 optional:
+            </p>
+            <ul class="mb-3">
+              <li>
+                <strong>title</strong> - Post title (max 255 characters)
+                <span class="badge bg-danger">Required</span>
+              </li>
+              <li>
+                <strong>description</strong> - Post description
+                <span class="badge bg-danger">Required</span>
+              </li>
+              <li>
+                <strong>price</strong> - Product price (numeric, e.g., 99.99)
+                <span class="badge bg-danger">Required</span>
+              </li>
+              <li>
+                <strong>image_url</strong> - Direct image URL (from Imgur,
+                Dropbox, Google Drive, etc.)
+                <span class="badge bg-success">Optional</span>
+              </li>
+            </ul>
+
+            <h6>📝 Example CSV WITHOUT Images:</h6>
+            <pre class="bg-light p-3 rounded"><code>title,description,price
+iPhone 13 Pro,Excellent condition iPhone with 256GB storage,699.99
+Samsung TV,55 inch 4K Smart TV with HDR support,450.00
+Gaming Laptop,High performance laptop with RTX 3060,1200.00</code></pre>
+
+            <h6>🖼️ Example CSV WITH Images:</h6>
+            <pre
+              class="bg-light p-3 rounded"
+            ><code>title,description,price,image_url
+iPhone 13 Pro,Excellent condition iPhone,699.99,https://i.imgur.com/abc123.jpg
+Samsung TV,55 inch 4K Smart TV,450.00,https://i.imgur.com/def456.png
+Gaming Laptop,High performance laptop,1200.00,https://i.imgur.com/ghi789.jpg</code></pre>
+
+            <h6>⚠️ Important Notes:</h6>
+            <ul>
+              <li>
+                <strong>Accounts:</strong> Check one or more Facebook accounts
+                using checkboxes. Use "Select All" to quickly select all
+                accounts.
+                <strong
+                  >ALL posts from CSV will be created for EACH selected
+                  account.</strong
+                >
+              </li>
+              <li>
+                <strong>Example:</strong> 3 posts in CSV + 2 accounts selected =
+                6 total posts created (3 for each account)
+              </li>
+              <li>
+                <strong>Images:</strong> Add <code>image_url</code> column with
+                direct image links. System will download and save images
+                automatically! Supported: Imgur, Dropbox, Google Drive, direct
+                links, etc.
+              </li>
+              <li>
+                <strong>No Image?</strong> Leave <code>image_url</code> blank or
+                omit the column entirely. You can add images later via Django
+                Admin.
+              </li>
+              <li>
+                <strong>Category:</strong> Defaults to "Furniture" and condition
+                to "New"
+              </li>
+              <li>
+                <strong>Scheduling:</strong> All posts scheduled for immediate
+                posting
+              </li>
+            </ul>
+          </div>
+
+          <div class="alert alert-success">
+            <h6>✨ Super Simple Process:</h6>
+            <ol class="mb-0">
+              <li>
+                ✅ Check one or more Facebook accounts (or use "Select All")
+              </li>
+              <li>
+                Create CSV with: <strong>title, description, price</strong> (+
+                optional <strong>image_url</strong>)
+              </li>
+              <li>
+                Upload CSV here (ALL posts will be created for EACH account with
+                images auto-downloaded)
+              </li>
+              <li>Optional: Add/change images later in Admin panel</li>
+              <li>Run: <code>python manage.py post_to_marketplace</code></li>
+            </ol>
+          </div>
+        </div>
+      </div>
+
+      <div class="mt-3">
+        <a href="{% url 'create_post' %}" class="btn btn-outline-primary">
+          ➕ Create Single Post Instead
+        </a>
+      </div>
+    </div>
+  </div>
+</div>
+
+<style>
+  pre code {
+    font-size: 0.85rem;
+  }
+  .account-checkbox-container {
+    max-height: 300px;
+    overflow-y: auto;
+  }
+  .form-check-input:checked {
+    background-color: #0d6efd;
+    border-color: #0d6efd;
+  }
+  #accountError {
+    display: none;
+  }
+</style>
+
+<script>
+  document.addEventListener("DOMContentLoaded", function () {
+    const selectAllCheckbox = document.getElementById("selectAllAccounts");
+    const accountCheckboxes = document.querySelectorAll(".account-checkbox");
+    const form = document.getElementById("bulkUploadForm");
+    const accountError = document.getElementById("accountError");
+    const accountCount = document.getElementById("accountCount");
+
+    // Update counter display
+    function updateCounter() {
+      const checkedCount = Array.from(accountCheckboxes).filter(
+        (cb) => cb.checked
+      ).length;
+      const totalCount = accountCheckboxes.length;
+
+      if (checkedCount === 0) {
+        accountCount.textContent = "0 selected";
+        accountCount.className = "badge bg-secondary ms-2";
+      } else if (checkedCount === totalCount) {
+        accountCount.textContent = "All " + totalCount + " selected";
+        accountCount.className = "badge bg-success ms-2";
+      } else {
+        accountCount.textContent =
+          checkedCount + " of " + totalCount + " selected";
+        accountCount.className = "badge bg-primary ms-2";
+      }
+    }
+
+    // Select All functionality
+    selectAllCheckbox.addEventListener("change", function () {
+      accountCheckboxes.forEach((checkbox) => {
+        checkbox.checked = selectAllCheckbox.checked;
+      });
+      accountError.style.display = "none";
+      updateCounter();
+    });
+
+    // Update Select All checkbox based on individual checkboxes
+    accountCheckboxes.forEach((checkbox) => {
+      checkbox.addEventListener("change", function () {
+        const allChecked = Array.from(accountCheckboxes).every(
+          (cb) => cb.checked
+        );
+        const someChecked = Array.from(accountCheckboxes).some(
+          (cb) => cb.checked
+        );
+
+        selectAllCheckbox.checked = allChecked;
+        selectAllCheckbox.indeterminate = someChecked && !allChecked;
+
+        if (someChecked) {
+          accountError.style.display = "none";
+        }
+
+        updateCounter();
+      });
+    });
+
+    // Form validation
+    form.addEventListener("submit", function (e) {
+      const checkedCount = Array.from(accountCheckboxes).filter(
+        (cb) => cb.checked
+      ).length;
+
+      if (checkedCount === 0) {
+        e.preventDefault();
+        accountError.style.display = "block";
+        accountError.scrollIntoView({ behavior: "smooth", block: "center" });
+        return false;
+      }
+    });
+
+    // Initialize counter
+    updateCounter();
+  });
+</script>
+{% endblock %}
