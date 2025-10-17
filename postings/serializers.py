@@ -11,6 +11,7 @@ class MarketplacePostSerializer(serializers.ModelSerializer):
         model = MarketplacePost
         fields = [
             'id', 'title', 'description', 'price', 'image',
-            'scheduled_time', 'posted', 'account', 'account_email'
+            'scheduled_time', 'posted', 'account', 'account_email',
+            'created_at', 'updated_at'
         ]
-        read_only_fields = ['posted']
+        read_only_fields = ['posted', 'created_at', 'updated_at']

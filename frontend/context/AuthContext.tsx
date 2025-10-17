@@ -1,0 +1,109 @@
+"use client";
+
+import React, { createContext, useState, useEffect, ReactNode } from "react";
+import { useRouter } from "next/navigation";
+import { authAPI } from "@/lib/api";
+import { User } from "@/types";
+
+interface AuthContextType {
+  user: User | null;
+  loading: boolean;
+  login: (email: string, password: string) => Promise<void>;
+  signup: (name: string, email: string, password: string) => Promise<void>;
+  logout: () => void;
+  isAuthenticated: boolean;
+}
+
+export const AuthContext = createContext<AuthContextType>({
+  user: null,
+  loading: true,
+  login: async () => {},
+  signup: async () => {},
+  logout: () => {},
+  isAuthenticated: false,
+});
+
+export function AuthProvider({ children }: { children: ReactNode }) {
+  const [user, setUser] = useState<User | null>(null);
+  const [loading, setLoading] = useState(true);
+  const router = useRouter();
+
+  useEffect(() => {
+    // Check if user is logged in on mount
+    const initAuth = async () => {
+      const token = localStorage.getItem("token");
+      const savedUser = localStorage.getItem("user");
+
+      if (token && savedUser) {
+        try {
+          // Verify token is still valid
+          const response = await authAPI.getProfile();
+          setUser(response.data);
+        } catch (error) {
+          // Token invalid, clear storage
+          localStorage.removeItem("token");
+          localStorage.removeItem("user");
+          setUser(null);
+        }
+      }
+      setLoading(false);
+    };
+
+    initAuth();
+  }, []);
+
+  const login = async (email: string, password: string) => {
+    try {
+      const response = await authAPI.login(email, password);
+      const { tokens, user } = response.data;
+
+      // Save access token to localStorage
+      localStorage.setItem("token", tokens.access);
+      localStorage.setItem("user", JSON.stringify(user));
+
+      setUser(user);
+      router.push("/dashboard");
+    } catch (error: any) {
+      throw new Error(error.response?.data?.error || "Login failed");
+    }
+  };
+
+  const signup = async (name: string, email: string, password: string) => {
+    try {
+      const response = await authAPI.signup(email, password, name);
+      const { tokens, user } = response.data;
+
+      // Save access token to localStorage
+      localStorage.setItem("token", tokens.access);
+      localStorage.setItem("user", JSON.stringify(user));
+
+      setUser(user);
+      router.push("/dashboard");
+    } catch (error: any) {
+      throw new Error(error.response?.data?.error || "Signup failed");
+    }
+  };
+
+  const logout = () => {
+    // Clear storage
+    localStorage.removeItem("token");
+    localStorage.removeItem("user");
+    setUser(null);
+    router.push("/login");
+  };
+
+  return (
+    <AuthContext.Provider
+      value={{
+        user,
+        loading,
+        login,
+        signup,
+        logout,
+        isAuthenticated: !!user,
+      }}
+    >
+      {children}
+    </AuthContext.Provider>
+  );
+}

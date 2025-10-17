@@ -11,6 +11,8 @@ class MarketplacePost(models.Model):
     image = models.ImageField(upload_to='posts/')
     scheduled_time = models.DateTimeField()
     posted = models.BooleanField(default=False)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
 
     def __str__(self):
         return f"{self.title} - {self.account.email}"
