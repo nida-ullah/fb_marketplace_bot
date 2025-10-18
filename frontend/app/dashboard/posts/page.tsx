@@ -16,6 +16,8 @@ import {
   Image as ImageIcon,
 } from "lucide-react";
 import Image from "next/image";
+import CreatePostModal from "@/components/CreatePostModal";
+import { useToast, ToastContainer } from "@/components/ui/Toast";
 
 interface MarketplacePost {
   id: number;
@@ -34,6 +36,8 @@ export default function PostsPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [filter, setFilter] = useState<"all" | "posted" | "pending">("all");
+  const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
+  const { toasts, removeToast, success, error: showError } = useToast();
 
   useEffect(() => {
     fetchPosts();
@@ -58,8 +62,9 @@ export default function PostsPage() {
     try {
       await postsAPI.delete(id);
       setPosts(posts.filter((post) => post.id !== id));
+      success("Post deleted successfully");
     } catch (err) {
-      alert("Failed to delete post");
+      showError("Failed to delete post");
       console.error(err);
     }
   };
@@ -89,6 +94,20 @@ export default function PostsPage() {
 
   return (
     <div className="space-y-6">
+      {/* Toast Notifications */}
+      <ToastContainer toasts={toasts} removeToast={removeToast} />
+
+      {/* Create Post Modal */}
+      <CreatePostModal
+        isOpen={isCreateModalOpen}
+        onClose={() => setIsCreateModalOpen(false)}
+        onSuccess={fetchPosts}
+        onToast={(type, message) => {
+          if (type === "success") success(message);
+          else showError(message);
+        }}
+      />
+
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
@@ -99,7 +118,11 @@ export default function PostsPage() {
             Manage your Facebook Marketplace listings
           </p>
         </div>
-        <Button variant="default" size="md">
+        <Button
+          variant="default"
+          size="md"
+          onClick={() => setIsCreateModalOpen(true)}
+        >
           <Plus className="mr-2 h-5 w-5" />
           Create Post
         </Button>
@@ -197,7 +220,10 @@ export default function PostsPage() {
               </p>
               {filter === "all" && (
                 <div className="mt-6">
-                  <Button variant="default">
+                  <Button
+                    variant="default"
+                    onClick={() => setIsCreateModalOpen(true)}
+                  >
                     <Plus className="mr-2 h-5 w-5" />
                     Create Post
                   </Button>
