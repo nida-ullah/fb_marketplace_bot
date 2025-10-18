@@ -281,6 +281,28 @@ export default function PostsPage() {
                 >
                   Clear Selection
                 </Button>
+                {/* Start Posting Button - Only for pending posts */}
+                {selectedPosts.some((id) => {
+                  const post = posts.find((p) => p.id === id);
+                  return post && !post.posted;
+                }) && (
+                  <Button
+                    variant="default"
+                    size="sm"
+                    onClick={() => alert("Start Posting feature coming soon!")}
+                    className="bg-green-600 hover:bg-green-700"
+                  >
+                    <CheckCircle className="h-4 w-4 mr-2" />
+                    Start Posting (
+                    {
+                      selectedPosts.filter((id) => {
+                        const post = posts.find((p) => p.id === id);
+                        return post && !post.posted;
+                      }).length
+                    }
+                    )
+                  </Button>
+                )}
                 <Button
                   variant="destructive"
                   size="sm"
@@ -290,7 +312,7 @@ export default function PostsPage() {
                   <Trash2 className="h-4 w-4 mr-2" />
                   {isDeleting
                     ? "Deleting..."
-                    : `Delete ${selectedPosts.length} Post(s)`}
+                    : `Delete ${selectedPosts.length}`}
                 </Button>
               </div>
             </div>
