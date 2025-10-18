@@ -263,3 +263,116 @@ class BulkUploadPostsView(APIView):
                 {'error': f'Error processing CSV file: {str(e)}'},
                 status=status.HTTP_400_BAD_REQUEST
             )
+
+
+class StartPostingView(APIView):
+    """Start posting selected pending posts to Facebook Marketplace"""
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        """Trigger posting process for selected post IDs"""
+        import subprocess
+        import sys
+
+        post_ids = request.data.get('post_ids', [])
+
+        # Validation
+        if not post_ids or not isinstance(post_ids, list):
+            return Response(
+                {'error': 'Please provide post_ids as an array'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        # Filter only pending posts
+        try:
+            pending_posts = MarketplacePost.objects.filter(
+                id__in=post_ids,
+                posted=False
+            )
+
+            if not pending_posts.exists():
+                return Response(
+                    {'error': 'No pending posts found with the provided IDs'},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+
+            pending_count = pending_posts.count()
+
+            # Start the posting script in background
+            # This runs the Django management command asynchronously
+            python_executable = sys.executable
+
+            # Get the project root directory (where manage.py is)
+            # __file__ is in postings/api_views.py
+            # Go up 2 levels: postings/ -> fb_marketplace_bot/
+            project_root = os.path.dirname(os.path.dirname(__file__))
+            manage_py_path = os.path.join(project_root, 'manage.py')
+
+            # Build command to run the management command
+            # Passing post IDs as comma-separated string
+            post_ids_str = ','.join(map(str, post_ids))
+            command = [
+                python_executable,
+                manage_py_path,
+                'post_to_marketplace',
+                '--post-ids',
+                post_ids_str
+            ]
+
+            # Create log files for debugging
+            log_dir = os.path.join(project_root, 'logs')
+            os.makedirs(log_dir, exist_ok=True)
+            log_file = os.path.join(log_dir, 'posting_process.log')
+
+            # Write initial log entry
+            try:
+                with open(log_file, 'a', encoding='utf-8') as log:
+                    log.write(
+                        f"\n\n=== Starting posting process at {timezone.now()} ===\n")
+                    log.write(f"Project root: {project_root}\n")
+                    log.write(f"manage.py path: {manage_py_path}\n")
+                    log.write(f"Command: {' '.join(command)}\n")
+                    log.write(f"Post IDs: {post_ids_str}\n\n")
+            except Exception as e:
+                print(f"Error writing to log file: {e}")
+
+            # Start subprocess in background with output logging
+            # Open log file separately to avoid context manager closing it
+            log_handle = open(log_file, 'a', encoding='utf-8')
+
+            # Set environment variables for UTF-8 encoding (fixes emoji/unicode issues on Windows)
+            env = os.environ.copy()
+            env['PYTHONIOENCODING'] = 'utf-8'
+
+            # In production (headless), don't create console window
+            # In development, show console for debugging
+            creation_flags = 0
+            if os.name == 'nt':  # Windows
+                # Only show console window if not in headless mode
+                headless = os.getenv('PLAYWRIGHT_HEADLESS',
+                                     'true').lower() == 'true'
+                if not headless:
+                    creation_flags = subprocess.CREATE_NEW_CONSOLE
+
+            subprocess.Popen(
+                command,
+                stdout=log_handle,
+                stderr=log_handle,
+                cwd=project_root,
+                env=env,
+                creationflags=creation_flags
+            )
+
+            return Response({
+                'success': True,
+                'message': f'Started posting process for {pending_count} pending post(s)',
+                'pending_count': pending_count,
+                'total_selected': len(post_ids),
+                'log_file': log_file
+            }, status=status.HTTP_200_OK)
+
+        except Exception as e:
+            return Response(
+                {'error': f'Error starting posting process: {str(e)}'},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )

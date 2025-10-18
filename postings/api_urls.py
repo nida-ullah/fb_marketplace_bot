@@ -11,4 +11,7 @@ urlpatterns = [
     # Bulk upload
     path('posts/bulk-upload/',
          api_views.BulkUploadPostsView.as_view(), name='bulk_upload'),
+    # Start posting
+    path('posts/start-posting/',
+         api_views.StartPostingView.as_view(), name='start_posting'),
 ]

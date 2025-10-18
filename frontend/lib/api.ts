@@ -104,6 +104,9 @@ export const postsAPI = {
       headers: { "Content-Type": "multipart/form-data" },
     });
   },
+
+  startPosting: (postIds: number[]) =>
+    api.post("/posts/start-posting/", { post_ids: postIds }),
 };
 
 export const statsAPI = {

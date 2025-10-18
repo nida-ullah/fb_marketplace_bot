@@ -9,14 +9,41 @@ import os
 class Command(BaseCommand):
     help = 'Posts scheduled marketplace listings to Facebook'
 
+    def add_arguments(self, parser):
+        """Add command line arguments"""
+        parser.add_argument(
+            '--post-ids',
+            type=str,
+            help='Comma-separated list of post IDs to publish (e.g., "1,2,3")',
+            dest='post_ids'
+        )
+
     def handle(self, *args, **options):
         print("Checking for posts to publish...")
 
-        # Get all posts that are scheduled for now or earlier and haven't been posted
-        posts: QuerySet[MarketplacePost] = MarketplacePost.objects.filter(  # type: ignore[attr-defined]
-            scheduled_time__lte=timezone.now(),
-            posted=False
-        )
+        # Check if specific post IDs were provided
+        post_ids_str = options.get('post_ids')
+
+        if post_ids_str:
+            # Parse comma-separated post IDs
+            try:
+                post_ids = [int(id.strip()) for id in post_ids_str.split(',')]
+                print(f"Publishing specific posts: {post_ids}")
+
+                # Get posts with specific IDs that haven't been posted
+                posts: QuerySet[MarketplacePost] = MarketplacePost.objects.filter(  # type: ignore[attr-defined]
+                    id__in=post_ids,
+                    posted=False
+                )
+            except ValueError:
+                print(f"Error: Invalid post IDs format: {post_ids_str}")
+                return
+        else:
+            # Get all posts that are scheduled for now or earlier and haven't been posted
+            posts: QuerySet[MarketplacePost] = MarketplacePost.objects.filter(  # type: ignore[attr-defined]
+                scheduled_time__lte=timezone.now(),
+                posted=False
+            )
 
         print(f"Found {posts.count()} posts to publish")
 

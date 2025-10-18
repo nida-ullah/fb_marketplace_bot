@@ -102,6 +102,42 @@ export default function PostsPage() {
     }
   };
 
+  const handleStartPosting = async () => {
+    // Get only pending posts from selection
+    const pendingPostIds = selectedPosts.filter((id) => {
+      const post = posts.find((p) => p.id === id);
+      return post && !post.posted;
+    });
+
+    if (pendingPostIds.length === 0) {
+      showError("No pending posts selected");
+      return;
+    }
+
+    if (
+      !confirm(
+        `Start posting ${pendingPostIds.length} pending post(s) to Facebook Marketplace?`
+      )
+    )
+      return;
+
+    try {
+      const response = await postsAPI.startPosting(pendingPostIds);
+      success(
+        response.data.message ||
+          `Started posting ${pendingPostIds.length} post(s)!`
+      );
+      // Optional: Refresh posts after a delay to see status updates
+      setTimeout(() => fetchPosts(), 3000);
+    } catch (err) {
+      const error = err as { response?: { data?: { error?: string } } };
+      showError(
+        error.response?.data?.error || "Failed to start posting process"
+      );
+      console.error(err);
+    }
+  };
+
   const handleSelectAll = () => {
     if (selectedPosts.length === filteredPosts.length) {
       setSelectedPosts([]);
@@ -289,7 +325,7 @@ export default function PostsPage() {
                   <Button
                     variant="default"
                     size="sm"
-                    onClick={() => alert("Start Posting feature coming soon!")}
+                    onClick={handleStartPosting}
                     className="bg-green-600 hover:bg-green-700"
                   >
                     <CheckCircle className="h-4 w-4 mr-2" />
