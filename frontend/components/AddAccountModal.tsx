@@ -44,17 +44,16 @@ export default function AddAccountModal({
     setLoading(true);
 
     try {
-      const response = await fetch(
-        `${process.env.NEXT_PUBLIC_API_URL}/accounts/add-with-login/`,
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${localStorage.getItem("token")}`,
-          },
-          body: JSON.stringify({ email, password }),
-        }
-      );
+      const API_URL =
+        process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000/api";
+      const response = await fetch(`${API_URL}/accounts/add-with-login/`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${localStorage.getItem("token")}`,
+        },
+        body: JSON.stringify({ email, password }),
+      });
 
       const data = await response.json();
 
@@ -79,8 +78,9 @@ export default function AddAccountModal({
         setSuccess(false);
         setMessage("");
       }, 2000);
-    } catch (err: any) {
-      setError(err.message || "Failed to add account");
+    } catch (err: unknown) {
+      const error = err as Error;
+      setError(error.message || "Failed to add account");
     } finally {
       setLoading(false);
     }

@@ -9,5 +9,6 @@ urlpatterns = [
     path('posts/<int:pk>/', api_views.MarketplacePostDetailView.as_view(),
          name='post_detail'),
     # Bulk upload
-    path('posts/bulk-upload/', api_views.BulkUploadPostsView.as_view(), name='bulk_upload'),
+    path('posts/bulk-upload/',
+         api_views.BulkUploadPostsView.as_view(), name='bulk_upload'),
 ]
