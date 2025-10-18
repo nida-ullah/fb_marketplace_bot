@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { Button } from "./ui/Button";
-import { X, Upload, Calendar } from "lucide-react";
+import { X, Upload } from "lucide-react";
 import { postsAPI, accountsAPI } from "@/lib/api";
 import Image from "next/image";
 
@@ -26,28 +26,27 @@ export default function CreatePostModal({
   onToast,
 }: CreatePostModalProps) {
   const [accounts, setAccounts] = useState<FacebookAccount[]>([]);
+  const [selectedAccounts, setSelectedAccounts] = useState<number[]>([]);
   const [formData, setFormData] = useState({
     title: "",
     description: "",
     price: "",
-    account: "",
-    scheduled_time: "",
   });
   const [image, setImage] = useState<File | null>(null);
+  const [imageUrl, setImageUrl] = useState<string>("");
   const [imagePreview, setImagePreview] = useState<string>("");
+  const [imageInputType, setImageInputType] = useState<"file" | "url">("file");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
   useEffect(() => {
     if (isOpen) {
       fetchAccounts();
-      // Set default scheduled time to current time
-      const now = new Date();
-      now.setMinutes(now.getMinutes() - now.getTimezoneOffset());
-      setFormData((prev) => ({
-        ...prev,
-        scheduled_time: now.toISOString().slice(0, 16),
-      }));
+      // Reset selected accounts when modal opens
+      setSelectedAccounts([]);
+      setImageUrl("");
+      setImagePreview("");
+      setImageInputType("file");
     }
   }, [isOpen]);
 
@@ -88,15 +87,44 @@ export default function CreatePostModal({
   };
 
   const handleInputChange = (
-    e: React.ChangeEvent<
-      HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement
-    >
+    e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
   ) => {
     const { name, value } = e.target;
     setFormData((prev) => ({
       ...prev,
       [name]: value,
     }));
+  };
+
+  const handleImageUrlChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const url = e.target.value;
+    setImageUrl(url);
+    setError("");
+
+    // Set preview to the URL itself if it's valid
+    if (url) {
+      setImagePreview(url);
+    } else {
+      setImagePreview("");
+    }
+  };
+
+  const handleAccountToggle = (accountId: number) => {
+    setSelectedAccounts((prev) => {
+      if (prev.includes(accountId)) {
+        return prev.filter((id) => id !== accountId);
+      } else {
+        return [...prev, accountId];
+      }
+    });
+  };
+
+  const handleSelectAllAccounts = () => {
+    if (selectedAccounts.length === accounts.length) {
+      setSelectedAccounts([]);
+    } else {
+      setSelectedAccounts(accounts.map((acc) => acc.id));
+    }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -116,38 +144,52 @@ export default function CreatePostModal({
       setError("Please enter a valid price");
       return;
     }
-    if (!formData.account) {
-      setError("Please select an account");
+    if (selectedAccounts.length === 0) {
+      setError("Please select at least one account");
       return;
     }
-    if (!image) {
-      setError("Please upload an image");
+    if (!image && !imageUrl.trim()) {
+      setError("Please upload an image or provide an image URL");
       return;
     }
-    if (!formData.scheduled_time) {
-      setError("Please select a scheduled time");
+    if (image && imageUrl.trim()) {
+      setError(
+        "Please provide either an uploaded image OR an image URL, not both"
+      );
       return;
     }
 
     setLoading(true);
 
     try {
-      // Create FormData for file upload
-      const submitData = new FormData();
-      submitData.append("title", formData.title);
-      submitData.append("description", formData.description);
-      submitData.append("price", formData.price);
-      submitData.append("account", formData.account);
-      submitData.append("scheduled_time", formData.scheduled_time);
-      if (image) {
-        submitData.append("image", image);
-      }
+      // Get current time for scheduled_time
+      const now = new Date().toISOString();
 
-      await postsAPI.create(submitData);
+      // Create posts for each selected account
+      const promises = selectedAccounts.map((accountId) => {
+        const submitData = new FormData();
+        submitData.append("title", formData.title);
+        submitData.append("description", formData.description);
+        submitData.append("price", formData.price);
+        submitData.append("account", accountId.toString());
+        submitData.append("scheduled_time", now);
+        if (image) {
+          submitData.append("image", image);
+        } else if (imageUrl) {
+          submitData.append("image_url", imageUrl);
+        }
+        return postsAPI.create(submitData);
+      });
+
+      await Promise.all(promises);
 
       // Show success message
       if (onToast) {
-        onToast("success", "Post created successfully!");
+        const accountText =
+          selectedAccounts.length === 1
+            ? "1 account"
+            : `${selectedAccounts.length} accounts`;
+        onToast("success", `Post created successfully for ${accountText}!`);
       }
 
       // Reset form
@@ -155,11 +197,12 @@ export default function CreatePostModal({
         title: "",
         description: "",
         price: "",
-        account: "",
-        scheduled_time: "",
       });
+      setSelectedAccounts([]);
       setImage(null);
+      setImageUrl("");
       setImagePreview("");
+      setImageInputType("file");
 
       onSuccess();
       onClose();
@@ -207,30 +250,63 @@ export default function CreatePostModal({
           )}
 
           <div className="space-y-4">
-            {/* Account Selection */}
+            {/* Account Selection - Multiple */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Facebook Account <span className="text-red-500">*</span>
-              </label>
-              <select
-                name="account"
-                value={formData.account}
-                onChange={handleInputChange}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                aria-label="Select Facebook account"
-                required
-              >
-                <option value="">Select an account</option>
-                {accounts.map((account) => (
-                  <option key={account.id} value={account.id}>
-                    {account.email}
-                    {account.session_exists ? " ✓" : " (No Session)"}
-                  </option>
-                ))}
-              </select>
-              {accounts.length === 0 && (
-                <p className="mt-1 text-sm text-gray-500">
+              <div className="flex items-center justify-between mb-2">
+                <label className="block text-sm font-medium text-gray-700">
+                  Facebook Accounts <span className="text-red-500">*</span>
+                </label>
+                {accounts.length > 0 && (
+                  <button
+                    type="button"
+                    onClick={handleSelectAllAccounts}
+                    className="text-sm text-blue-600 hover:text-blue-800 font-medium"
+                  >
+                    {selectedAccounts.length === accounts.length
+                      ? "Deselect All"
+                      : "Select All"}
+                  </button>
+                )}
+              </div>
+
+              {accounts.length === 0 ? (
+                <p className="text-sm text-gray-500 p-3 bg-gray-50 rounded-lg">
                   No accounts available. Please add an account first.
+                </p>
+              ) : (
+                <div className="border border-gray-300 rounded-lg divide-y divide-gray-200 max-h-48 overflow-y-auto">
+                  {accounts.map((account) => (
+                    <label
+                      key={account.id}
+                      className="flex items-center p-3 hover:bg-gray-50 cursor-pointer transition-colors"
+                    >
+                      <input
+                        type="checkbox"
+                        checked={selectedAccounts.includes(account.id)}
+                        onChange={() => handleAccountToggle(account.id)}
+                        className="h-4 w-4 text-blue-600 rounded border-gray-300 focus:ring-2 focus:ring-blue-500"
+                      />
+                      <span className="ml-3 flex-1 text-sm">
+                        {account.email}
+                      </span>
+                      {account.session_exists ? (
+                        <span className="ml-2 text-xs font-medium text-green-600 bg-green-50 px-2 py-1 rounded">
+                          ✓ Active
+                        </span>
+                      ) : (
+                        <span className="ml-2 text-xs font-medium text-red-600 bg-red-50 px-2 py-1 rounded">
+                          No Session
+                        </span>
+                      )}
+                    </label>
+                  ))}
+                </div>
+              )}
+
+              {selectedAccounts.length > 0 && (
+                <p className="mt-2 text-sm text-gray-600">
+                  {selectedAccounts.length} account
+                  {selectedAccounts.length !== 1 ? "s" : ""} selected
                 </p>
               )}
             </div>
@@ -292,85 +368,147 @@ export default function CreatePostModal({
               />
             </div>
 
-            {/* Image Upload */}
+            {/* Image Upload or URL */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 Product Image <span className="text-red-500">*</span>
               </label>
-              <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center hover:border-blue-500 transition-colors">
-                {imagePreview ? (
-                  <div className="space-y-4">
-                    <Image
-                      src={imagePreview}
-                      alt="Preview"
-                      width={400}
-                      height={300}
-                      className="max-h-64 mx-auto rounded-lg object-contain"
-                    />
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      onClick={() => {
-                        setImage(null);
-                        setImagePreview("");
-                      }}
-                    >
-                      Remove Image
-                    </Button>
-                  </div>
-                ) : (
-                  <div>
-                    <Upload className="mx-auto h-12 w-12 text-gray-400" />
-                    <p className="mt-2 text-sm text-gray-600">
-                      Click to upload or drag and drop
-                    </p>
-                    <p className="mt-1 text-xs text-gray-500">
-                      PNG, JPG, GIF up to 5MB
-                    </p>
-                    <input
-                      type="file"
-                      accept="image/*"
-                      onChange={handleImageChange}
-                      className="hidden"
-                      id="image-upload"
-                      aria-label="Upload product image"
-                    />
-                    <label htmlFor="image-upload">
+
+              {/* Toggle between File Upload and URL */}
+              <div className="flex gap-2 mb-3">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setImageInputType("file");
+                    setImageUrl("");
+                    setImagePreview("");
+                  }}
+                  className={`flex-1 px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+                    imageInputType === "file"
+                      ? "bg-blue-600 text-white"
+                      : "bg-gray-100 text-gray-700 hover:bg-gray-200"
+                  }`}
+                >
+                  Upload File
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setImageInputType("url");
+                    setImage(null);
+                    setImagePreview("");
+                  }}
+                  className={`flex-1 px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+                    imageInputType === "url"
+                      ? "bg-blue-600 text-white"
+                      : "bg-gray-100 text-gray-700 hover:bg-gray-200"
+                  }`}
+                >
+                  Image URL
+                </button>
+              </div>
+
+              {imageInputType === "file" ? (
+                // File Upload Section
+                <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center hover:border-blue-500 transition-colors">
+                  {imagePreview && image ? (
+                    <div className="space-y-4">
+                      <Image
+                        src={imagePreview}
+                        alt="Preview"
+                        width={400}
+                        height={300}
+                        className="max-h-64 mx-auto rounded-lg object-contain"
+                      />
                       <Button
                         type="button"
                         variant="outline"
                         size="sm"
-                        className="mt-4"
-                        onClick={() =>
-                          document.getElementById("image-upload")?.click()
-                        }
+                        onClick={() => {
+                          setImage(null);
+                          setImagePreview("");
+                        }}
                       >
-                        Select Image
+                        Remove Image
                       </Button>
-                    </label>
-                  </div>
-                )}
-              </div>
-            </div>
+                    </div>
+                  ) : (
+                    <div>
+                      <Upload className="mx-auto h-12 w-12 text-gray-400" />
+                      <p className="mt-2 text-sm text-gray-600">
+                        Click to upload or drag and drop
+                      </p>
+                      <p className="mt-1 text-xs text-gray-500">
+                        PNG, JPG, GIF up to 5MB
+                      </p>
+                      <input
+                        type="file"
+                        accept="image/*"
+                        onChange={handleImageChange}
+                        className="hidden"
+                        id="image-upload"
+                        aria-label="Upload product image"
+                      />
+                      <label htmlFor="image-upload">
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          className="mt-4"
+                          onClick={() =>
+                            document.getElementById("image-upload")?.click()
+                          }
+                        >
+                          Select Image
+                        </Button>
+                      </label>
+                    </div>
+                  )}
+                </div>
+              ) : (
+                // URL Input Section
+                <div className="space-y-3">
+                  <input
+                    type="url"
+                    value={imageUrl}
+                    onChange={handleImageUrlChange}
+                    placeholder="https://example.com/image.jpg"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  />
+                  <p className="text-xs text-gray-500">
+                    Paste the URL of an image from the web
+                  </p>
 
-            {/* Scheduled Time */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                <Calendar className="inline h-4 w-4 mr-1" />
-                Scheduled Time <span className="text-red-500">*</span>
-              </label>
-              <input
-                type="datetime-local"
-                name="scheduled_time"
-                value={formData.scheduled_time}
-                onChange={handleInputChange}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                required
-              />
-              <p className="mt-1 text-sm text-gray-500">
-                When should this post be published to Facebook?
-              </p>
+                  {imagePreview && imageUrl && (
+                    <div className="border-2 border-gray-300 rounded-lg p-4">
+                      <p className="text-sm text-gray-600 mb-2">Preview:</p>
+                      <Image
+                        src={imagePreview}
+                        alt="URL Preview"
+                        width={400}
+                        height={300}
+                        className="max-h-64 mx-auto rounded-lg object-contain"
+                        onError={() => {
+                          setError("Invalid image URL or image failed to load");
+                          setImagePreview("");
+                        }}
+                      />
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        className="mt-3"
+                        onClick={() => {
+                          setImageUrl("");
+                          setImagePreview("");
+                        }}
+                      >
+                        Clear URL
+                      </Button>
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
           </div>
 
@@ -387,10 +525,16 @@ export default function CreatePostModal({
             </Button>
             <Button
               type="submit"
-              disabled={loading || accounts.length === 0}
+              disabled={loading || selectedAccounts.length === 0}
               className="flex-1"
             >
-              {loading ? "Creating..." : "Create Post"}
+              {loading
+                ? "Creating..."
+                : `Create Post${
+                    selectedAccounts.length > 1
+                      ? ` (${selectedAccounts.length})`
+                      : ""
+                  }`}
             </Button>
           </div>
         </form>
