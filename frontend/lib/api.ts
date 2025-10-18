@@ -97,7 +97,9 @@ export const postsAPI = {
   bulkUpload: (file: File, accountIds: number[]) => {
     const formData = new FormData();
     formData.append("csv_file", file);
-    formData.append("account_ids", JSON.stringify(accountIds));
+    accountIds.forEach((id) => {
+      formData.append("accounts[]", id.toString());
+    });
     return api.post("/posts/bulk-upload/", formData, {
       headers: { "Content-Type": "multipart/form-data" },
     });
