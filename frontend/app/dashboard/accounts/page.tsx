@@ -32,6 +32,8 @@ export default function AccountsPage() {
   const [updatingSessionId, setUpdatingSessionId] = useState<number | null>(
     null
   );
+  const [selectedAccounts, setSelectedAccounts] = useState<number[]>([]);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   useEffect(() => {
     fetchAccounts();
@@ -60,6 +62,60 @@ export default function AccountsPage() {
       alert("Failed to delete account");
       console.error(err);
     }
+  };
+
+  const handleBulkDelete = async () => {
+    if (selectedAccounts.length === 0) return;
+
+    if (
+      !confirm(
+        `Are you sure you want to delete ${selectedAccounts.length} account(s)?`
+      )
+    ) {
+      return;
+    }
+
+    try {
+      setIsDeleting(true);
+      const deletePromises = selectedAccounts.map((id) =>
+        accountsAPI.delete(id)
+      );
+      const results = await Promise.allSettled(deletePromises);
+
+      const successCount = results.filter(
+        (r) => r.status === "fulfilled"
+      ).length;
+      const failCount = results.filter((r) => r.status === "rejected").length;
+
+      if (successCount > 0) {
+        alert(`Successfully deleted ${successCount} account(s)`);
+        setSelectedAccounts([]);
+        fetchAccounts();
+      }
+
+      if (failCount > 0) {
+        alert(`Failed to delete ${failCount} account(s)`);
+      }
+    } catch (err) {
+      alert("Failed to delete accounts");
+      console.error(err);
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+
+  const handleSelectAll = () => {
+    if (selectedAccounts.length === accounts.length) {
+      setSelectedAccounts([]);
+    } else {
+      setSelectedAccounts(accounts.map((acc) => acc.id));
+    }
+  };
+
+  const handleSelectAccount = (id: number) => {
+    setSelectedAccounts((prev) =>
+      prev.includes(id) ? prev.filter((accId) => accId !== id) : [...prev, id]
+    );
   };
 
   const handleUpdateSession = async (id: number) => {
@@ -195,7 +251,50 @@ export default function AccountsPage() {
       {/* Accounts Table */}
       <Card>
         <CardHeader>
-          <CardTitle>All Accounts</CardTitle>
+          <div className="flex items-center justify-between">
+            <div className="flex flex-col gap-2">
+              <CardTitle>All Accounts</CardTitle>
+              {accounts.length > 0 && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleSelectAll}
+                  className="w-fit"
+                >
+                  {selectedAccounts.length === accounts.length
+                    ? "Deselect All"
+                    : "Select All"}
+                </Button>
+              )}
+            </div>
+
+            {/* Bulk Actions - Right Side */}
+            {selectedAccounts.length > 0 && (
+              <div className="flex items-center gap-3">
+                <span className="text-sm font-medium text-gray-700">
+                  {selectedAccounts.length} selected
+                </span>
+                <Button
+                  variant="destructive"
+                  size="sm"
+                  onClick={handleBulkDelete}
+                  disabled={isDeleting}
+                >
+                  {isDeleting ? (
+                    <>
+                      <RefreshCw className="mr-2 h-4 w-4 animate-spin" />
+                      Deleting...
+                    </>
+                  ) : (
+                    <>
+                      <Trash2 className="mr-2 h-4 w-4" />
+                      Delete {selectedAccounts.length}
+                    </>
+                  )}
+                </Button>
+              </div>
+            )}
+          </div>
         </CardHeader>
         <CardContent>
           {accounts.length === 0 ? (
@@ -219,6 +318,9 @@ export default function AccountsPage() {
               <table className="w-full">
                 <thead className="bg-gray-50">
                   <tr>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-12">
+                      {/* Checkbox column header - empty for safety */}
+                    </th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                       Email
                     </th>
@@ -235,7 +337,23 @@ export default function AccountsPage() {
                 </thead>
                 <tbody className="bg-white divide-y divide-gray-200">
                   {accounts.map((account) => (
-                    <tr key={account.id} className="hover:bg-gray-50">
+                    <tr
+                      key={account.id}
+                      className={`hover:bg-gray-50 ${
+                        selectedAccounts.includes(account.id)
+                          ? "bg-blue-50"
+                          : ""
+                      }`}
+                    >
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <input
+                          type="checkbox"
+                          checked={selectedAccounts.includes(account.id)}
+                          onChange={() => handleSelectAccount(account.id)}
+                          className="h-4 w-4 text-blue-600 rounded border-gray-300 focus:ring-2 focus:ring-blue-500 cursor-pointer"
+                          aria-label={`Select account ${account.email}`}
+                        />
+                      </td>
                       <td className="px-6 py-4 whitespace-nowrap">
                         <div className="flex items-center">
                           <div className="flex-shrink-0 h-10 w-10 bg-blue-100 rounded-full flex items-center justify-center">
