@@ -1,4 +1,4 @@
-from rest_framework import generics
+from rest_framework import generics, serializers
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework import status
@@ -85,6 +85,52 @@ class MarketplacePostDetailView(generics.RetrieveUpdateDestroyAPIView):
     queryset = MarketplacePost.objects.all()
     serializer_class = MarketplacePostSerializer
     permission_classes = [IsAuthenticated]
+
+    def update(self, request, *args, **kwargs):
+        """Handle post update with better error handling - supports partial updates"""
+        # Force partial update (PATCH behavior even for PUT)
+        kwargs['partial'] = True
+        instance = self.get_object()
+
+        # Log the incoming data for debugging
+        print(f"\n=== Update Post #{instance.id} ===")
+        print(f"Data received: {dict(request.data)}")
+        print(f"Files: {list(request.FILES.keys())}")
+
+        # Prepare data for serializer
+        data = request.data.copy()
+
+        # Handle boolean conversion for 'posted' field if sent as string
+        if 'posted' in data:
+            if isinstance(data['posted'], str):
+                data['posted'] = data['posted'].lower() in ('true', '1', 'yes')
+
+        serializer = self.get_serializer(
+            instance, data=data, partial=True)
+
+        try:
+            serializer.is_valid(raise_exception=True)
+            self.perform_update(serializer)
+
+            print(f"✓ Post #{instance.id} updated successfully")
+            print(
+                f"Updated fields: {list(serializer.validated_data.keys())}\n")
+
+            return Response(serializer.data)
+        except serializers.ValidationError as e:
+            print(f"✗ Validation errors: {e.detail}")
+            return Response(
+                {'error': e.detail},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        except Exception as e:
+            print(f"✗ Unexpected error: {str(e)}\n")
+            error_msg = str(e) if str(
+                e) else "An error occurred while updating the post"
+            return Response(
+                {'error': error_msg},
+                status=status.HTTP_400_BAD_REQUEST
+            )
 
 
 class BulkUploadPostsView(APIView):
