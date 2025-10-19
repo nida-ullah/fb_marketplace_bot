@@ -6,6 +6,7 @@ from accounts.models import FacebookAccount
 class MarketplacePostSerializer(serializers.ModelSerializer):
     account_email = serializers.EmailField(
         source='account.email', read_only=True)
+    scheduled_time = serializers.DateTimeField(required=False)
 
     class Meta:
         model = MarketplacePost
@@ -14,4 +15,4 @@ class MarketplacePostSerializer(serializers.ModelSerializer):
             'scheduled_time', 'posted', 'account', 'account_email',
             'created_at', 'updated_at'
         ]
-        read_only_fields = ['posted', 'created_at', 'updated_at']
+        read_only_fields = ['created_at', 'updated_at']

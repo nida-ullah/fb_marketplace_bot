@@ -19,6 +19,7 @@ import {
 } from "lucide-react";
 import Image from "next/image";
 import CreatePostModal from "@/components/CreatePostModal";
+import EditPostModal from "@/components/EditPostModal";
 import { useToast, ToastContainer } from "@/components/ui/Toast";
 
 interface MarketplacePost {
@@ -39,6 +40,8 @@ export default function PostsPage() {
   const [error, setError] = useState("");
   const [filter, setFilter] = useState<"all" | "posted" | "pending">("all");
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [editingPost, setEditingPost] = useState<MarketplacePost | null>(null);
   const [viewMode, setViewMode] = useState<"grid" | "list">("list");
   const [selectedPosts, setSelectedPosts] = useState<number[]>([]);
   const [isDeleting, setIsDeleting] = useState(false);
@@ -73,6 +76,11 @@ export default function PostsPage() {
       showError("Failed to delete post");
       console.error(err);
     }
+  };
+
+  const handleEdit = (post: MarketplacePost) => {
+    setEditingPost(post);
+    setIsEditModalOpen(true);
   };
 
   const handleBulkDelete = async () => {
@@ -191,6 +199,21 @@ export default function PostsPage() {
           if (type === "success") success(message);
           else showError(message);
         }}
+      />
+
+      {/* Edit Post Modal */}
+      <EditPostModal
+        isOpen={isEditModalOpen}
+        onClose={() => {
+          setIsEditModalOpen(false);
+          setEditingPost(null);
+        }}
+        onSuccess={fetchPosts}
+        onToast={(type, message) => {
+          if (type === "success") success(message);
+          else showError(message);
+        }}
+        post={editingPost}
       />
 
       {/* Header */}
@@ -488,9 +511,7 @@ export default function PostsPage() {
                         <Button
                           variant="outline"
                           size="sm"
-                          onClick={() =>
-                            alert("Edit functionality coming soon")
-                          }
+                          onClick={() => handleEdit(post)}
                         >
                           <Edit size={14} className="mr-1" />
                           Edit
@@ -599,7 +620,7 @@ export default function PostsPage() {
                         variant="outline"
                         size="sm"
                         className="flex-1"
-                        onClick={() => alert("Edit functionality coming soon")}
+                        onClick={() => handleEdit(post)}
                       >
                         <Edit size={16} className="mr-1" />
                         Edit
