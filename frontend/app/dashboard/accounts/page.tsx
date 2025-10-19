@@ -186,7 +186,7 @@ export default function AccountsPage() {
             className="flex items-center gap-2"
           >
             <Upload size={20} />
-            Bulk Upload
+            Upload Multiple Accounts
           </Button>
           <Button
             onClick={() => setIsModalOpen(true)}

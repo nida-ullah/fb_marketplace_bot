@@ -156,7 +156,7 @@ export default function DashboardPage() {
               className="flex flex-col items-center justify-center rounded-lg border-2 border-dashed border-gray-300 p-6 transition-colors hover:border-purple-600 hover:bg-purple-50"
             >
               <CheckCircle className="h-8 w-8 text-purple-600 mb-2" />
-              <span className="font-medium">Bulk Upload</span>
+              <span className="font-medium">Create Multiple Posts</span>
             </a>
           </div>
         </CardContent>

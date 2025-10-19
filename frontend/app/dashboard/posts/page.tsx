@@ -20,6 +20,7 @@ import {
 import Image from "next/image";
 import CreatePostModal from "@/components/CreatePostModal";
 import EditPostModal from "@/components/EditPostModal";
+import BulkUploadPostsModal from "@/components/BulkUploadPostsModal";
 import { useToast, ToastContainer } from "@/components/ui/Toast";
 
 interface MarketplacePost {
@@ -40,6 +41,7 @@ export default function PostsPage() {
   const [error, setError] = useState("");
   const [filter, setFilter] = useState<"all" | "posted" | "pending">("all");
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
+  const [isBulkUploadOpen, setIsBulkUploadOpen] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [editingPost, setEditingPost] = useState<MarketplacePost | null>(null);
   const [viewMode, setViewMode] = useState<"grid" | "list">("list");
@@ -216,24 +218,44 @@ export default function PostsPage() {
         post={editingPost}
       />
 
+      {/* Bulk Upload Posts Modal */}
+      <BulkUploadPostsModal
+        isOpen={isBulkUploadOpen}
+        onClose={() => setIsBulkUploadOpen(false)}
+        onSuccess={fetchPosts}
+        onToast={(type, message) => {
+          if (type === "success") success(message);
+          else showError(message);
+        }}
+      />
+
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold text-gray-900">
             Marketplace Posts
           </h1>
-          <p className="mt-2 text-gray-600">
+          <p className="text-gray-600 mt-1">
             Manage your Facebook Marketplace listings
           </p>
         </div>
-        <Button
-          variant="default"
-          size="md"
-          onClick={() => setIsCreateModalOpen(true)}
-        >
-          <Plus className="mr-2 h-5 w-5" />
-          Create Post
-        </Button>
+        <div className="flex gap-3">
+          <Button
+            onClick={() => setIsBulkUploadOpen(true)}
+            variant="purple"
+            className="flex items-center gap-2"
+          >
+            <Package size={20} />
+            Create Multiple Posts
+          </Button>
+          <Button
+            onClick={() => setIsCreateModalOpen(true)}
+            className="flex items-center gap-2"
+          >
+            <Plus size={20} />
+            Create Single Post
+          </Button>
+        </div>
       </div>
 
       {/* Stats Cards */}

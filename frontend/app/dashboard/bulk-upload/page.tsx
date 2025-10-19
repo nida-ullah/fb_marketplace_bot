@@ -156,7 +156,7 @@ Gaming Laptop,High performance gaming laptop with RTX 3060 graphics card. Perfec
         {/* Header */}
         <div className="mb-6">
           <h1 className="text-3xl font-bold text-gray-900 mb-2">
-            📦 Bulk Upload Posts via CSV
+            📦 Create Multiple Posts via CSV
           </h1>
           <p className="text-gray-600">
             Upload multiple posts at once using a CSV file. Each post will be

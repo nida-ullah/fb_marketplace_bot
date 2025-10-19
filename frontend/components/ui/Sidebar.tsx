@@ -7,10 +7,10 @@ import {
   LayoutDashboard,
   Users,
   FileText,
-  Upload,
   BarChart3,
   Settings,
   LogOut,
+  Upload,
 } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 
@@ -18,7 +18,11 @@ const navigation = [
   { name: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
   { name: "Accounts", href: "/dashboard/accounts", icon: Users },
   { name: "Posts", href: "/dashboard/posts", icon: FileText },
-  { name: "Bulk Upload", href: "/dashboard/bulk-upload", icon: Upload },
+  {
+    name: "Create Multiple Posts",
+    href: "/dashboard/bulk-upload",
+    icon: Upload,
+  },
   { name: "Analytics", href: "/dashboard/analytics", icon: BarChart3 },
   { name: "Settings", href: "/dashboard/settings", icon: Settings },
 ];
