@@ -9,7 +9,48 @@ const nextConfig: NextConfig = {
         port: "8000",
         pathname: "/media/**",
       },
+      {
+        protocol: "https",
+        hostname: "drive.google.com",
+      },
+      {
+        protocol: "https",
+        hostname: "*.googleusercontent.com",
+      },
+      {
+        protocol: "https",
+        hostname: "lh3.googleusercontent.com",
+      },
+      {
+        protocol: "https",
+        hostname: "*.imgur.com",
+      },
+      {
+        protocol: "http",
+        hostname: "*.imgur.com",
+      },
+      {
+        protocol: "https",
+        hostname: "i.imgur.com",
+      },
+      {
+        protocol: "https",
+        hostname: "imgur.com",
+      },
+      {
+        protocol: "https",
+        hostname: "*.sharepoint.com",
+      },
+      {
+        protocol: "https",
+        hostname: "onedrive.live.com",
+      },
+      {
+        protocol: "https",
+        hostname: "*.1drv.com",
+      },
     ],
+    unoptimized: true, // Allow external images without optimization
   },
 };
 

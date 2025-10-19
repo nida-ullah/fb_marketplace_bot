@@ -33,9 +33,7 @@ export default function CreatePostModal({
     price: "",
   });
   const [image, setImage] = useState<File | null>(null);
-  const [imageUrl, setImageUrl] = useState<string>("");
   const [imagePreview, setImagePreview] = useState<string>("");
-  const [imageInputType, setImageInputType] = useState<"file" | "url">("file");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
@@ -44,9 +42,7 @@ export default function CreatePostModal({
       fetchAccounts();
       // Reset selected accounts when modal opens
       setSelectedAccounts([]);
-      setImageUrl("");
       setImagePreview("");
-      setImageInputType("file");
     }
   }, [isOpen]);
 
@@ -96,19 +92,6 @@ export default function CreatePostModal({
     }));
   };
 
-  const handleImageUrlChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const url = e.target.value;
-    setImageUrl(url);
-    setError("");
-
-    // Set preview to the URL itself if it's valid
-    if (url) {
-      setImagePreview(url);
-    } else {
-      setImagePreview("");
-    }
-  };
-
   const handleAccountToggle = (accountId: number) => {
     setSelectedAccounts((prev) => {
       if (prev.includes(accountId)) {
@@ -148,14 +131,8 @@ export default function CreatePostModal({
       setError("Please select at least one account");
       return;
     }
-    if (!image && !imageUrl.trim()) {
-      setError("Please upload an image or provide an image URL");
-      return;
-    }
-    if (image && imageUrl.trim()) {
-      setError(
-        "Please provide either an uploaded image OR an image URL, not both"
-      );
+    if (!image) {
+      setError("Please upload an image");
       return;
     }
 
@@ -173,11 +150,7 @@ export default function CreatePostModal({
         submitData.append("price", formData.price);
         submitData.append("account", accountId.toString());
         submitData.append("scheduled_time", now);
-        if (image) {
-          submitData.append("image", image);
-        } else if (imageUrl) {
-          submitData.append("image_url", imageUrl);
-        }
+        submitData.append("image", image);
         return postsAPI.create(submitData);
       });
 
@@ -200,17 +173,23 @@ export default function CreatePostModal({
       });
       setSelectedAccounts([]);
       setImage(null);
-      setImageUrl("");
       setImagePreview("");
-      setImageInputType("file");
 
       onSuccess();
       onClose();
     } catch (err) {
-      const error = err as { response?: { data?: { error?: string } } };
-      const errorMessage =
-        error.response?.data?.error ||
-        "Failed to create post. Please try again.";
+      const error = err as {
+        response?: { data?: { error?: string; detail?: string } };
+      };
+      let errorMessage = "Failed to create post. Please try again.";
+
+      // Check for specific error messages
+      if (error.response?.data?.error) {
+        errorMessage = error.response.data.error;
+      } else if (error.response?.data?.detail) {
+        errorMessage = error.response.data.detail;
+      }
+
       setError(errorMessage);
 
       if (onToast) {
@@ -368,147 +347,68 @@ export default function CreatePostModal({
               />
             </div>
 
-            {/* Image Upload or URL */}
+            {/* Image Upload */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 Product Image <span className="text-red-500">*</span>
               </label>
 
-              {/* Toggle between File Upload and URL */}
-              <div className="flex gap-2 mb-3">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setImageInputType("file");
-                    setImageUrl("");
-                    setImagePreview("");
-                  }}
-                  className={`flex-1 px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-                    imageInputType === "file"
-                      ? "bg-blue-600 text-white"
-                      : "bg-gray-100 text-gray-700 hover:bg-gray-200"
-                  }`}
-                >
-                  Upload File
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setImageInputType("url");
-                    setImage(null);
-                    setImagePreview("");
-                  }}
-                  className={`flex-1 px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-                    imageInputType === "url"
-                      ? "bg-blue-600 text-white"
-                      : "bg-gray-100 text-gray-700 hover:bg-gray-200"
-                  }`}
-                >
-                  Image URL
-                </button>
+              {/* File Upload Section */}
+              <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center hover:border-blue-500 transition-colors">
+                {imagePreview && image ? (
+                  <div className="space-y-4">
+                    <Image
+                      src={imagePreview}
+                      alt="Preview"
+                      width={400}
+                      height={300}
+                      className="max-h-64 mx-auto rounded-lg object-contain"
+                    />
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => {
+                        setImage(null);
+                        setImagePreview("");
+                      }}
+                    >
+                      Remove Image
+                    </Button>
+                  </div>
+                ) : (
+                  <div>
+                    <Upload className="mx-auto h-12 w-12 text-gray-400" />
+                    <p className="mt-2 text-sm text-gray-600">
+                      Click to upload or drag and drop
+                    </p>
+                    <p className="mt-1 text-xs text-gray-500">
+                      PNG, JPG, GIF up to 5MB
+                    </p>
+                    <input
+                      type="file"
+                      accept="image/*"
+                      onChange={handleImageChange}
+                      className="hidden"
+                      id="image-upload"
+                      aria-label="Upload product image"
+                    />
+                    <label htmlFor="image-upload">
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        className="mt-4"
+                        onClick={() =>
+                          document.getElementById("image-upload")?.click()
+                        }
+                      >
+                        Select Image
+                      </Button>
+                    </label>
+                  </div>
+                )}
               </div>
-
-              {imageInputType === "file" ? (
-                // File Upload Section
-                <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center hover:border-blue-500 transition-colors">
-                  {imagePreview && image ? (
-                    <div className="space-y-4">
-                      <Image
-                        src={imagePreview}
-                        alt="Preview"
-                        width={400}
-                        height={300}
-                        className="max-h-64 mx-auto rounded-lg object-contain"
-                      />
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        onClick={() => {
-                          setImage(null);
-                          setImagePreview("");
-                        }}
-                      >
-                        Remove Image
-                      </Button>
-                    </div>
-                  ) : (
-                    <div>
-                      <Upload className="mx-auto h-12 w-12 text-gray-400" />
-                      <p className="mt-2 text-sm text-gray-600">
-                        Click to upload or drag and drop
-                      </p>
-                      <p className="mt-1 text-xs text-gray-500">
-                        PNG, JPG, GIF up to 5MB
-                      </p>
-                      <input
-                        type="file"
-                        accept="image/*"
-                        onChange={handleImageChange}
-                        className="hidden"
-                        id="image-upload"
-                        aria-label="Upload product image"
-                      />
-                      <label htmlFor="image-upload">
-                        <Button
-                          type="button"
-                          variant="outline"
-                          size="sm"
-                          className="mt-4"
-                          onClick={() =>
-                            document.getElementById("image-upload")?.click()
-                          }
-                        >
-                          Select Image
-                        </Button>
-                      </label>
-                    </div>
-                  )}
-                </div>
-              ) : (
-                // URL Input Section
-                <div className="space-y-3">
-                  <input
-                    type="url"
-                    value={imageUrl}
-                    onChange={handleImageUrlChange}
-                    placeholder="https://example.com/image.jpg"
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  />
-                  <p className="text-xs text-gray-500">
-                    Paste the URL of an image from the web
-                  </p>
-
-                  {imagePreview && imageUrl && (
-                    <div className="border-2 border-gray-300 rounded-lg p-4">
-                      <p className="text-sm text-gray-600 mb-2">Preview:</p>
-                      <Image
-                        src={imagePreview}
-                        alt="URL Preview"
-                        width={400}
-                        height={300}
-                        className="max-h-64 mx-auto rounded-lg object-contain"
-                        onError={() => {
-                          setError("Invalid image URL or image failed to load");
-                          setImagePreview("");
-                        }}
-                      />
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        className="mt-3"
-                        onClick={() => {
-                          setImageUrl("");
-                          setImagePreview("");
-                        }}
-                      >
-                        Clear URL
-                      </Button>
-                    </div>
-                  )}
-                </div>
-              )}
             </div>
           </div>
 
