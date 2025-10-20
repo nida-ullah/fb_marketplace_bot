@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/Card";
-import { Users, FileText, CheckCircle, Clock } from "lucide-react";
+import { Users, FileText, CheckCircle, Clock, Settings } from "lucide-react";
 import { statsAPI } from "@/lib/api";
 import { DashboardStats } from "@/types";
 
@@ -152,11 +152,11 @@ export default function DashboardPage() {
               <span className="font-medium">View Posts</span>
             </a>
             <a
-              href="/dashboard/bulk-upload"
+              href="/dashboard/settings"
               className="flex flex-col items-center justify-center rounded-lg border-2 border-dashed border-gray-300 p-6 transition-colors hover:border-purple-600 hover:bg-purple-50"
             >
-              <CheckCircle className="h-8 w-8 text-purple-600 mb-2" />
-              <span className="font-medium">Create Multiple Posts</span>
+              <Settings className="h-8 w-8 text-purple-600 mb-2" />
+              <span className="font-medium">Settings</span>
             </a>
           </div>
         </CardContent>
