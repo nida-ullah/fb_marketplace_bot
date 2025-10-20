@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { postsAPI } from "@/lib/api";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
@@ -54,6 +54,9 @@ export default function PostsPage() {
   >([]);
   const { toasts, removeToast, success, error: showError } = useToast();
 
+  // Counter to ensure unique IDs for activity logs
+  const logIdCounterRef = useRef(0);
+
   // Load activity logs from localStorage on mount
   useEffect(() => {
     const savedLogs = localStorage.getItem("activityLogs");
@@ -67,11 +70,18 @@ export default function PostsPage() {
           timestamp: string;
         }>;
 
-        // Convert timestamp strings back to Date objects
-        const logsWithDates = parsedLogs.map((log) => ({
-          ...log,
-          timestamp: new Date(log.timestamp),
-        }));
+        // Convert timestamp strings back to Date objects and regenerate unique IDs
+        const logsWithDates = parsedLogs.map((log) => {
+          // Generate new unique ID to avoid duplicates from localStorage
+          logIdCounterRef.current += 1;
+          const uniqueId = Date.now() * 1000 + logIdCounterRef.current;
+
+          return {
+            ...log,
+            id: uniqueId, // Replace with new unique ID
+            timestamp: new Date(log.timestamp),
+          };
+        });
 
         // Filter out logs older than 24 hours
         const now = new Date();
@@ -85,6 +95,8 @@ export default function PostsPage() {
         setActivityLogs(recentLogs);
       } catch (error) {
         console.error("Failed to load activity logs:", error);
+        // Clear corrupted localStorage data
+        localStorage.removeItem("activityLogs");
       }
     }
   }, []);
@@ -125,8 +137,12 @@ export default function PostsPage() {
     const now = new Date();
     const twentyFourHoursAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000);
 
+    // Generate unique ID using timestamp + counter
+    logIdCounterRef.current += 1;
+    const uniqueId = Date.now() * 1000 + logIdCounterRef.current;
+
     const newLog = {
-      id: Date.now(),
+      id: uniqueId,
       type,
       message,
       details,
@@ -252,6 +268,9 @@ export default function PostsPage() {
       return;
     }
 
+    // Get post details for logging
+    const postsToPostDetails = posts.filter((p) => postsToPost.includes(p.id));
+
     const count = postsToPost.length;
     const message =
       selectedPosts.length > 0
@@ -261,24 +280,79 @@ export default function PostsPage() {
     if (!confirm(message)) return;
 
     try {
+      // Log the start of posting
+      addActivityLog(
+        "post",
+        "Posting initiated",
+        `Starting to post ${count} item(s) to Facebook Marketplace...`
+      );
+
       const response = await postsAPI.startPosting(postsToPost);
       success(response.data.message || `Started posting ${count} post(s)!`);
 
-      // Log posting activity
-      addActivityLog(
-        "post",
-        "Posting started",
-        `${count} post(s) sent to Facebook Marketplace`
-      );
-
       setSelectedPosts([]);
-      // Refresh posts after a delay to see status updates
-      setTimeout(() => fetchPosts(), 3000);
+
+      // Poll for status updates every 3 seconds
+      const pollInterval = setInterval(async () => {
+        try {
+          const updatedPostsResponse = await postsAPI.list();
+          const updatedPosts = updatedPostsResponse.data;
+
+          // Check each post for status change
+          postsToPostDetails.forEach((originalPost) => {
+            const updatedPost = updatedPosts.find(
+              (p: MarketplacePost) => p.id === originalPost.id
+            );
+
+            if (updatedPost && updatedPost.posted && !originalPost.posted) {
+              // Post was successfully posted
+              addActivityLog(
+                "post",
+                "Post successful",
+                `"${updatedPost.title}" posted successfully to ${updatedPost.account_email}`
+              );
+              success(`Posted: ${updatedPost.title}`);
+
+              // Update the original post to prevent duplicate logs
+              originalPost.posted = true;
+            }
+          });
+
+          // Update posts state
+          setPosts(updatedPosts);
+
+          // Check if all posts are done
+          const allPosted = postsToPostDetails.every((p) => p.posted);
+          if (allPosted) {
+            clearInterval(pollInterval);
+            addActivityLog(
+              "post",
+              "Posting completed",
+              `All ${count} post(s) have been processed`
+            );
+          }
+        } catch (error) {
+          console.error("Error polling for updates:", error);
+        }
+      }, 3000); // Poll every 3 seconds
+
+      // Stop polling after 5 minutes (max time)
+      setTimeout(() => {
+        clearInterval(pollInterval);
+      }, 300000); // 5 minutes
     } catch (err) {
       const error = err as { response?: { data?: { error?: string } } };
-      showError(
-        error.response?.data?.error || "Failed to start posting process"
+      const errorMsg =
+        error.response?.data?.error || "Failed to start posting process";
+      showError(errorMsg);
+
+      // Log the failure
+      addActivityLog(
+        "post",
+        "Posting failed",
+        `Failed to start posting: ${errorMsg}`
       );
+
       console.error(err);
     }
   };
