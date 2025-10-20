@@ -14,8 +14,6 @@ import {
   Calendar,
   DollarSign,
   Image as ImageIcon,
-  Grid,
-  List,
 } from "lucide-react";
 import Image from "next/image";
 import CreatePostModal from "@/components/CreatePostModal";
@@ -39,19 +37,110 @@ export default function PostsPage() {
   const [posts, setPosts] = useState<MarketplacePost[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
-  const [filter, setFilter] = useState<"all" | "posted" | "pending">("all");
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [isBulkUploadOpen, setIsBulkUploadOpen] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [editingPost, setEditingPost] = useState<MarketplacePost | null>(null);
-  const [viewMode, setViewMode] = useState<"grid" | "list">("list");
-  const [selectedPosts, setSelectedPosts] = useState<number[]>([]);
-  const [isDeleting, setIsDeleting] = useState(false);
+  const [selectedPosts, setSelectedPosts] = useState<number[]>([]); // For pending posts
+  const [selectedPostedItems, setSelectedPostedItems] = useState<number[]>([]); // For posted items
+  const [activityLogs, setActivityLogs] = useState<
+    Array<{
+      id: number;
+      type: "create" | "edit" | "delete" | "post" | "bulk" | "account";
+      message: string;
+      details: string;
+      timestamp: Date;
+    }>
+  >([]);
   const { toasts, removeToast, success, error: showError } = useToast();
+
+  // Load activity logs from localStorage on mount
+  useEffect(() => {
+    const savedLogs = localStorage.getItem("activityLogs");
+    if (savedLogs) {
+      try {
+        const parsedLogs = JSON.parse(savedLogs) as Array<{
+          id: number;
+          type: "create" | "edit" | "delete" | "post" | "bulk" | "account";
+          message: string;
+          details: string;
+          timestamp: string;
+        }>;
+
+        // Convert timestamp strings back to Date objects
+        const logsWithDates = parsedLogs.map((log) => ({
+          ...log,
+          timestamp: new Date(log.timestamp),
+        }));
+
+        // Filter out logs older than 24 hours
+        const now = new Date();
+        const twentyFourHoursAgo = new Date(
+          now.getTime() - 24 * 60 * 60 * 1000
+        );
+        const recentLogs = logsWithDates.filter(
+          (log) => log.timestamp.getTime() > twentyFourHoursAgo.getTime()
+        );
+
+        setActivityLogs(recentLogs);
+      } catch (error) {
+        console.error("Failed to load activity logs:", error);
+      }
+    }
+  }, []);
+
+  // Save activity logs to localStorage whenever they change
+  useEffect(() => {
+    if (activityLogs.length > 0) {
+      localStorage.setItem("activityLogs", JSON.stringify(activityLogs));
+    }
+  }, [activityLogs]);
 
   useEffect(() => {
     fetchPosts();
   }, []);
+
+  // Cleanup old logs every minute
+  useEffect(() => {
+    const cleanupInterval = setInterval(() => {
+      const now = new Date();
+      const twentyFourHoursAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+
+      setActivityLogs((prev) =>
+        prev.filter(
+          (log) => log.timestamp.getTime() > twentyFourHoursAgo.getTime()
+        )
+      );
+    }, 60000); // Run every 60 seconds
+
+    return () => clearInterval(cleanupInterval);
+  }, []);
+
+  // Helper function to add activity log
+  const addActivityLog = (
+    type: "create" | "edit" | "delete" | "post" | "bulk" | "account",
+    message: string,
+    details: string
+  ) => {
+    const now = new Date();
+    const twentyFourHoursAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+
+    const newLog = {
+      id: Date.now(),
+      type,
+      message,
+      details,
+      timestamp: new Date(),
+    };
+
+    // Filter out logs older than 24 hours and add new log
+    setActivityLogs((prev) => {
+      const recentLogs = prev.filter(
+        (log) => log.timestamp.getTime() > twentyFourHoursAgo.getTime()
+      );
+      return [newLog, ...recentLogs];
+    });
+  };
 
   const fetchPosts = async () => {
     try {
@@ -69,11 +158,25 @@ export default function PostsPage() {
   const handleDelete = async (id: number) => {
     if (!confirm("Are you sure you want to delete this post?")) return;
 
+    const postToDelete = posts.find((p) => p.id === id);
+
     try {
       await postsAPI.delete(id);
       setPosts(posts.filter((post) => post.id !== id));
       setSelectedPosts(selectedPosts.filter((postId) => postId !== id));
+      setSelectedPostedItems(
+        selectedPostedItems.filter((postId) => postId !== id)
+      );
       success("Post deleted successfully");
+
+      // Log the deletion
+      if (postToDelete) {
+        addActivityLog(
+          "delete",
+          "Post deleted",
+          `"${postToDelete.title}" removed from listings`
+        );
+      }
     } catch (err) {
       showError("Failed to delete post");
       console.error(err);
@@ -85,59 +188,91 @@ export default function PostsPage() {
     setIsEditModalOpen(true);
   };
 
-  const handleBulkDelete = async () => {
+  const handleSelectPost = (postId: number) => {
+    if (selectedPosts.includes(postId)) {
+      setSelectedPosts(selectedPosts.filter((id) => id !== postId));
+    } else {
+      setSelectedPosts([...selectedPosts, postId]);
+    }
+  };
+
+  const handleSelectAll = () => {
+    const pendingPosts = posts.filter((p) => !p.posted);
+    if (selectedPosts.length === pendingPosts.length) {
+      // Deselect all
+      setSelectedPosts([]);
+    } else {
+      // Select all pending posts
+      setSelectedPosts(pendingPosts.map((post) => post.id));
+    }
+  };
+
+  const handleDeleteSelected = async () => {
     if (selectedPosts.length === 0) {
-      showError("Please select posts to delete");
+      showError("Please select at least one post to delete");
       return;
     }
 
     if (
       !confirm(
-        `Are you sure you want to delete ${selectedPosts.length} post(s)?`
+        `Are you sure you want to delete ${selectedPosts.length} selected post(s)?`
       )
     )
       return;
 
-    setIsDeleting(true);
+    const count = selectedPosts.length;
+
     try {
       await Promise.all(selectedPosts.map((id) => postsAPI.delete(id)));
       setPosts(posts.filter((post) => !selectedPosts.includes(post.id)));
-      success(`Successfully deleted ${selectedPosts.length} post(s)`);
+      success(`Successfully deleted ${count} post(s)`);
+
+      // Log bulk deletion
+      addActivityLog(
+        "delete",
+        "Bulk deletion",
+        `${count} pending post(s) deleted`
+      );
+
       setSelectedPosts([]);
     } catch (err) {
       showError("Failed to delete some posts");
       console.error(err);
-    } finally {
-      setIsDeleting(false);
     }
   };
 
   const handleStartPosting = async () => {
-    // Get only pending posts from selection
-    const pendingPostIds = selectedPosts.filter((id) => {
-      const post = posts.find((p) => p.id === id);
-      return post && !post.posted;
-    });
+    // If no posts are selected, use all pending posts
+    const pendingPosts = posts.filter((p) => !p.posted);
+    const postsToPost =
+      selectedPosts.length > 0 ? selectedPosts : pendingPosts.map((p) => p.id);
 
-    if (pendingPostIds.length === 0) {
-      showError("No pending posts selected");
+    if (postsToPost.length === 0) {
+      showError("No pending posts available");
       return;
     }
 
-    if (
-      !confirm(
-        `Start posting ${pendingPostIds.length} pending post(s) to Facebook Marketplace?`
-      )
-    )
-      return;
+    const count = postsToPost.length;
+    const message =
+      selectedPosts.length > 0
+        ? `Start posting ${count} selected post(s) to Facebook Marketplace?`
+        : `Start posting all ${count} pending post(s) to Facebook Marketplace?`;
+
+    if (!confirm(message)) return;
 
     try {
-      const response = await postsAPI.startPosting(pendingPostIds);
-      success(
-        response.data.message ||
-          `Started posting ${pendingPostIds.length} post(s)!`
+      const response = await postsAPI.startPosting(postsToPost);
+      success(response.data.message || `Started posting ${count} post(s)!`);
+
+      // Log posting activity
+      addActivityLog(
+        "post",
+        "Posting started",
+        `${count} post(s) sent to Facebook Marketplace`
       );
-      // Optional: Refresh posts after a delay to see status updates
+
+      setSelectedPosts([]);
+      // Refresh posts after a delay to see status updates
       setTimeout(() => fetchPosts(), 3000);
     } catch (err) {
       const error = err as { response?: { data?: { error?: string } } };
@@ -148,27 +283,65 @@ export default function PostsPage() {
     }
   };
 
-  const handleSelectAll = () => {
-    if (selectedPosts.length === filteredPosts.length) {
-      setSelectedPosts([]);
+  // Functions for Posted Items
+  const handleSelectPostedItem = (postId: number) => {
+    if (selectedPostedItems.includes(postId)) {
+      setSelectedPostedItems(selectedPostedItems.filter((id) => id !== postId));
     } else {
-      setSelectedPosts(filteredPosts.map((post) => post.id));
+      setSelectedPostedItems([...selectedPostedItems, postId]);
     }
   };
 
-  const handleSelectPost = (postId: number) => {
-    if (selectedPosts.includes(postId)) {
-      setSelectedPosts(selectedPosts.filter((id) => id !== postId));
+  const handleSelectAllPosted = () => {
+    const postedPosts = posts.filter((p) => p.posted);
+    if (selectedPostedItems.length === postedPosts.length) {
+      // Deselect all
+      setSelectedPostedItems([]);
     } else {
-      setSelectedPosts([...selectedPosts, postId]);
+      // Select all posted items
+      setSelectedPostedItems(postedPosts.map((post) => post.id));
     }
   };
 
-  const filteredPosts = posts.filter((post) => {
-    if (filter === "posted") return post.posted;
-    if (filter === "pending") return !post.posted;
-    return true;
-  });
+  const handleDeleteSelectedPosted = async () => {
+    // If no items are selected, use all posted items
+    const postedPosts = posts.filter((p) => p.posted);
+    const itemsToDelete =
+      selectedPostedItems.length > 0
+        ? selectedPostedItems
+        : postedPosts.map((p) => p.id);
+
+    if (itemsToDelete.length === 0) {
+      showError("No posted items available to delete");
+      return;
+    }
+
+    const count = itemsToDelete.length;
+    const message =
+      selectedPostedItems.length > 0
+        ? `Are you sure you want to delete ${count} selected posted item(s)?`
+        : `Are you sure you want to delete all ${count} posted item(s)?`;
+
+    if (!confirm(message)) return;
+
+    try {
+      await Promise.all(itemsToDelete.map((id) => postsAPI.delete(id)));
+      setPosts(posts.filter((post) => !itemsToDelete.includes(post.id)));
+      success(`Successfully deleted ${count} posted item(s)`);
+
+      // Log deletion of posted items
+      addActivityLog(
+        "delete",
+        "Posted items deleted",
+        `${count} posted item(s) removed from listings`
+      );
+
+      setSelectedPostedItems([]);
+    } catch (err) {
+      showError("Failed to delete some posted items");
+      console.error(err);
+    }
+  };
 
   const stats = {
     total: posts.length,
@@ -196,7 +369,14 @@ export default function PostsPage() {
       <CreatePostModal
         isOpen={isCreateModalOpen}
         onClose={() => setIsCreateModalOpen(false)}
-        onSuccess={fetchPosts}
+        onSuccess={() => {
+          fetchPosts();
+          addActivityLog(
+            "create",
+            "Post created",
+            "New post added to pending posts"
+          );
+        }}
         onToast={(type, message) => {
           if (type === "success") success(message);
           else showError(message);
@@ -210,7 +390,16 @@ export default function PostsPage() {
           setIsEditModalOpen(false);
           setEditingPost(null);
         }}
-        onSuccess={fetchPosts}
+        onSuccess={() => {
+          fetchPosts();
+          if (editingPost) {
+            addActivityLog(
+              "edit",
+              "Post updated",
+              `"${editingPost.title}" has been edited`
+            );
+          }
+        }}
         onToast={(type, message) => {
           if (type === "success") success(message);
           else showError(message);
@@ -218,11 +407,20 @@ export default function PostsPage() {
         post={editingPost}
       />
 
-      {/* Bulk Upload Posts Modal */}
+      {/* Bulk Upload Modal */}
       <BulkUploadPostsModal
         isOpen={isBulkUploadOpen}
         onClose={() => setIsBulkUploadOpen(false)}
-        onSuccess={fetchPosts}
+        onSuccess={(count?: number) => {
+          fetchPosts();
+          addActivityLog(
+            "bulk",
+            "Bulk upload completed",
+            count
+              ? `${count} posts uploaded successfully`
+              : "Multiple posts uploaded successfully"
+          );
+        }}
         onToast={(type, message) => {
           if (type === "success") success(message);
           else showError(message);
@@ -300,368 +498,335 @@ export default function PostsPage() {
         </Card>
       </div>
 
-      {/* Filter and View Controls */}
-      <div className="flex items-center justify-between gap-4 flex-wrap">
-        <div className="flex gap-2">
-          <Button
-            variant={filter === "all" ? "default" : "outline"}
-            size="sm"
-            onClick={() => setFilter("all")}
-          >
-            All Posts ({stats.total})
-          </Button>
-          <Button
-            variant={filter === "posted" ? "default" : "outline"}
-            size="sm"
-            onClick={() => setFilter("posted")}
-          >
-            Posted ({stats.posted})
-          </Button>
-          <Button
-            variant={filter === "pending" ? "default" : "outline"}
-            size="sm"
-            onClick={() => setFilter("pending")}
-          >
-            Pending ({stats.pending})
-          </Button>
-        </div>
-
-        <div className="flex gap-2">
-          <Button
-            variant={viewMode === "list" ? "default" : "outline"}
-            size="sm"
-            onClick={() => setViewMode("list")}
-          >
-            <List className="h-4 w-4 mr-2" />
-            List
-          </Button>
-          <Button
-            variant={viewMode === "grid" ? "default" : "outline"}
-            size="sm"
-            onClick={() => setViewMode("grid")}
-          >
-            <Grid className="h-4 w-4 mr-2" />
-            Grid
-          </Button>
-        </div>
-      </div>
-
-      {/* Bulk Actions */}
-      {selectedPosts.length > 0 && (
-        <Card className="bg-blue-50 border-blue-200">
-          <CardContent className="py-4">
+      {/* Two Boxes: Pending Posts (Left) and Posted (Right) */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* Pending Posts Box - LEFT SIDE */}
+        <Card className="flex flex-col h-[650px]">
+          <CardHeader>
             <div className="flex items-center justify-between">
-              <p className="text-sm font-medium text-blue-900">
-                {selectedPosts.length} post(s) selected
-              </p>
-              <div className="flex gap-2">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setSelectedPosts([])}
-                >
-                  Clear Selection
-                </Button>
-                {/* Start Posting Button - Only for pending posts */}
-                {selectedPosts.some((id) => {
-                  const post = posts.find((p) => p.id === id);
-                  return post && !post.posted;
-                }) && (
-                  <Button
-                    variant="default"
-                    size="sm"
-                    onClick={handleStartPosting}
-                    className="bg-green-600 hover:bg-green-700"
-                  >
-                    <CheckCircle className="h-4 w-4 mr-2" />
-                    Start Posting (
-                    {
-                      selectedPosts.filter((id) => {
-                        const post = posts.find((p) => p.id === id);
-                        return post && !post.posted;
-                      }).length
-                    }
-                    )
-                  </Button>
-                )}
-                <Button
-                  variant="destructive"
-                  size="sm"
-                  onClick={handleBulkDelete}
-                  disabled={isDeleting}
-                >
-                  <Trash2 className="h-4 w-4 mr-2" />
-                  {isDeleting
-                    ? "Deleting..."
-                    : `Delete ${selectedPosts.length}`}
-                </Button>
-              </div>
+              <CardTitle className="flex items-center gap-2">
+                <XCircle className="h-5 w-5 text-orange-600" />
+                Pending Posts ({stats.pending})
+              </CardTitle>
             </div>
-          </CardContent>
-        </Card>
-      )}
+          </CardHeader>
+          <CardContent className="flex-1 flex flex-col overflow-hidden">
+            <div className="space-y-3 flex-1 overflow-y-auto">
+              {posts.filter((p) => !p.posted).length === 0 ? (
+                <div className="text-center py-8 text-gray-500">
+                  <XCircle className="h-12 w-12 mx-auto mb-2 text-gray-300" />
+                  <p>No pending posts</p>
+                </div>
+              ) : (
+                posts
+                  .filter((p) => !p.posted)
+                  .map((post) => (
+                    <div
+                      key={post.id}
+                      className={`border rounded-lg p-3 transition-colors ${
+                        selectedPosts.includes(post.id)
+                          ? "bg-blue-50 border-blue-300"
+                          : "hover:bg-gray-50"
+                      }`}
+                    >
+                      <div className="flex items-start gap-3">
+                        {/* Checkbox */}
+                        <input
+                          type="checkbox"
+                          checked={selectedPosts.includes(post.id)}
+                          onChange={() => handleSelectPost(post.id)}
+                          className="mt-1 h-5 w-5 text-blue-600 rounded border-gray-300 focus:ring-2 focus:ring-blue-500 cursor-pointer flex-shrink-0"
+                          aria-label={`Select post: ${post.title}`}
+                        />
+                        <div className="relative w-16 h-16 flex-shrink-0 bg-gray-200 rounded overflow-hidden">
+                          {post.image ? (
+                            <Image
+                              src={post.image}
+                              alt={post.title}
+                              fill
+                              className="object-cover"
+                              sizes="64px"
+                            />
+                          ) : (
+                            <div className="flex items-center justify-center h-full">
+                              <ImageIcon className="h-6 w-6 text-gray-400" />
+                            </div>
+                          )}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <h4 className="font-semibold text-sm truncate">
+                            {post.title}
+                          </h4>
+                          <p className="text-xs text-gray-500 line-clamp-1">
+                            {post.description}
+                          </p>
+                          <div className="flex items-center gap-2 mt-1">
+                            <span className="text-sm font-bold text-blue-600">
+                              ${post.price}
+                            </span>
+                            <span className="text-xs text-gray-400">•</span>
+                            <span className="text-xs text-gray-500">
+                              {new Date(
+                                post.scheduled_time
+                              ).toLocaleDateString()}
+                            </span>
+                          </div>
+                          <div className="text-xs text-gray-600 mt-1 truncate">
+                            <span className="font-medium">Account:</span>{" "}
+                            {post.account_email}
+                          </div>
+                          <div className="flex gap-1 mt-2">
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => handleEdit(post)}
+                              className="text-xs px-2 py-1 h-auto"
+                            >
+                              <Edit size={12} className="mr-1" />
+                              Edit
+                            </Button>
+                            <Button
+                              variant="destructive"
+                              size="sm"
+                              onClick={() => handleDelete(post.id)}
+                              className="text-xs px-2 py-1 h-auto"
+                            >
+                              <Trash2 size={12} className="mr-1" />
+                              Delete
+                            </Button>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  ))
+              )}
+            </div>
 
-      {/* Posts List/Grid */}
-      <Card>
-        <CardHeader>
-          <div className="flex items-center justify-between">
-            <CardTitle>All Posts</CardTitle>
-            {filteredPosts.length > 0 && (
-              <Button variant="outline" size="sm" onClick={handleSelectAll}>
-                {selectedPosts.length === filteredPosts.length
+            {/* Action Buttons - Below Pending Posts - Fixed to Bottom */}
+            <div className="flex gap-2 mt-4 pt-4 border-t flex-shrink-0">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleSelectAll}
+                className="flex-1"
+                disabled={posts.filter((p) => !p.posted).length === 0}
+              >
+                {selectedPosts.length === posts.filter((p) => !p.posted).length
                   ? "Deselect All"
                   : "Select All"}
               </Button>
-            )}
-          </div>
-        </CardHeader>
-        <CardContent>
-          {error && (
-            <div className="bg-red-50 text-red-600 p-4 rounded-md mb-4">
-              {error}
+              <Button
+                variant="destructive"
+                size="sm"
+                onClick={handleDeleteSelected}
+                disabled={selectedPosts.length === 0}
+                className="flex-1"
+              >
+                <Trash2 className="h-4 w-4 mr-2" />
+                Delete Selected
+              </Button>
+              <Button
+                onClick={handleStartPosting}
+                className="bg-green-600 hover:bg-green-700 text-white flex-1"
+                size="sm"
+                disabled={posts.filter((p) => !p.posted).length === 0}
+              >
+                <CheckCircle className="h-4 w-4 mr-2" />
+                Start Posting
+                {selectedPosts.length > 0 && ` (${selectedPosts.length})`}
+              </Button>
             </div>
-          )}
+          </CardContent>
+        </Card>
 
-          {filteredPosts.length === 0 ? (
-            <div className="text-center py-12">
-              <Package className="mx-auto h-12 w-12 text-gray-400" />
-              <h3 className="mt-2 text-sm font-medium text-gray-900">
-                No posts found
-              </h3>
-              <p className="mt-1 text-sm text-gray-500">
-                {filter === "all"
-                  ? "Get started by creating a new post."
-                  : `No ${filter} posts available.`}
-              </p>
-              {filter === "all" && (
-                <div className="mt-6">
-                  <Button
-                    variant="default"
-                    onClick={() => setIsCreateModalOpen(true)}
-                  >
-                    <Plus className="mr-2 h-5 w-5" />
-                    Create Post
-                  </Button>
+        {/* Posted Box - RIGHT SIDE */}
+        <Card className="flex flex-col h-[650px]">
+          <CardHeader>
+            <div className="flex items-center justify-between">
+              <CardTitle className="flex items-center gap-2">
+                <CheckCircle className="h-5 w-5 text-green-600" />
+                Posted ({stats.posted})
+              </CardTitle>
+            </div>
+          </CardHeader>
+          <CardContent className="flex-1 flex flex-col overflow-hidden">
+            <div className="space-y-3 flex-1 overflow-y-auto">
+              {posts.filter((p) => p.posted).length === 0 ? (
+                <div className="text-center py-8 text-gray-500">
+                  <CheckCircle className="h-12 w-12 mx-auto mb-2 text-gray-300" />
+                  <p>No posted items yet</p>
                 </div>
-              )}
-            </div>
-          ) : viewMode === "list" ? (
-            // List View
-            <div className="space-y-3">
-              {filteredPosts.map((post) => (
-                <div
-                  key={post.id}
-                  className={`border rounded-lg p-4 hover:bg-gray-50 transition-colors ${
-                    selectedPosts.includes(post.id)
-                      ? "bg-blue-50 border-blue-300"
-                      : ""
-                  }`}
-                >
-                  <div className="flex items-start gap-4">
-                    {/* Checkbox */}
-                    <input
-                      type="checkbox"
-                      checked={selectedPosts.includes(post.id)}
-                      onChange={() => handleSelectPost(post.id)}
-                      className="mt-1 h-5 w-5 text-blue-600 rounded border-gray-300 focus:ring-2 focus:ring-blue-500 cursor-pointer"
-                      aria-label={`Select post: ${post.title}`}
-                    />
-
-                    {/* Image - Smaller thumbnail */}
-                    <div className="relative w-20 h-20 flex-shrink-0 bg-gray-200 rounded-lg overflow-hidden">
-                      {post.image ? (
-                        <Image
-                          src={post.image}
-                          alt={post.title}
-                          fill
-                          className="object-cover"
-                          sizes="80px"
+              ) : (
+                posts
+                  .filter((p) => p.posted)
+                  .map((post) => (
+                    <div
+                      key={post.id}
+                      className={`border rounded-lg p-3 transition-colors ${
+                        selectedPostedItems.includes(post.id)
+                          ? "bg-green-50 border-green-300"
+                          : "hover:bg-gray-50"
+                      }`}
+                    >
+                      <div className="flex items-start gap-3">
+                        {/* Checkbox */}
+                        <input
+                          type="checkbox"
+                          checked={selectedPostedItems.includes(post.id)}
+                          onChange={() => handleSelectPostedItem(post.id)}
+                          className="mt-1 h-5 w-5 text-green-600 rounded border-gray-300 focus:ring-2 focus:ring-green-500 cursor-pointer flex-shrink-0"
+                          aria-label={`Select posted item: ${post.title}`}
                         />
-                      ) : (
-                        <div className="flex items-center justify-center h-full">
-                          <ImageIcon className="h-8 w-8 text-gray-400" />
-                        </div>
-                      )}
-                    </div>
-
-                    {/* Post Details */}
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-start justify-between gap-4">
-                        <div className="flex-1 min-w-0">
-                          <h3 className="font-semibold text-gray-900 truncate">
-                            {post.title}
-                          </h3>
-                          <p className="text-sm text-gray-600 line-clamp-2 mt-1">
-                            {post.description}
-                          </p>
-                        </div>
-
-                        {/* Status Badge */}
-                        <div className="flex-shrink-0">
-                          {post.posted ? (
-                            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
-                              <CheckCircle className="h-3 w-3 mr-1" />
-                              Posted
-                            </span>
+                        <div className="relative w-16 h-16 flex-shrink-0 bg-gray-200 rounded overflow-hidden">
+                          {post.image ? (
+                            <Image
+                              src={post.image}
+                              alt={post.title}
+                              fill
+                              className="object-cover"
+                              sizes="64px"
+                            />
                           ) : (
-                            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-orange-100 text-orange-800">
-                              <XCircle className="h-3 w-3 mr-1" />
-                              Pending
-                            </span>
+                            <div className="flex items-center justify-center h-full">
+                              <ImageIcon className="h-6 w-6 text-gray-400" />
+                            </div>
                           )}
                         </div>
-                      </div>
-
-                      {/* Meta Information */}
-                      <div className="flex items-center gap-4 mt-3 text-sm text-gray-500">
-                        <div className="flex items-center gap-1 font-semibold text-blue-600">
-                          <DollarSign className="h-4 w-4" />
-                          {post.price}
+                        <div className="flex-1 min-w-0">
+                          <h4 className="font-semibold text-sm truncate">
+                            {post.title}
+                          </h4>
+                          <p className="text-xs text-gray-500 line-clamp-1">
+                            {post.description}
+                          </p>
+                          <div className="flex items-center gap-2 mt-1">
+                            <span className="text-sm font-bold text-blue-600">
+                              ${post.price}
+                            </span>
+                            <span className="text-xs text-gray-400">•</span>
+                            <span className="text-xs text-gray-500">
+                              {new Date(
+                                post.scheduled_time
+                              ).toLocaleDateString()}
+                            </span>
+                          </div>
+                          <div className="text-xs text-gray-600 mt-1 truncate">
+                            <span className="font-medium">Account:</span>{" "}
+                            {post.account_email}
+                          </div>
+                          <div className="flex gap-1 mt-2">
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => handleEdit(post)}
+                              className="text-xs px-2 py-1 h-auto"
+                            >
+                              <Edit size={12} className="mr-1" />
+                              Edit
+                            </Button>
+                            <Button
+                              variant="destructive"
+                              size="sm"
+                              onClick={() => handleDelete(post.id)}
+                              className="text-xs px-2 py-1 h-auto"
+                            >
+                              <Trash2 size={12} className="mr-1" />
+                              Delete
+                            </Button>
+                          </div>
                         </div>
-                        <div className="flex items-center gap-1 truncate">
-                          <span className="font-medium">Account:</span>
-                          <span className="truncate">{post.account_email}</span>
-                        </div>
-                        <div className="flex items-center gap-1">
-                          <Calendar className="h-4 w-4" />
-                          {new Date(post.scheduled_time).toLocaleDateString()}
-                        </div>
-                      </div>
-
-                      {/* Actions */}
-                      <div className="flex gap-2 mt-3">
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => handleEdit(post)}
-                        >
-                          <Edit size={14} className="mr-1" />
-                          Edit
-                        </Button>
-                        <Button
-                          variant="destructive"
-                          size="sm"
-                          onClick={() => handleDelete(post.id)}
-                        >
-                          <Trash2 size={14} className="mr-1" />
-                          Delete
-                        </Button>
                       </div>
                     </div>
-                  </div>
-                </div>
-              ))}
+                  ))
+              )}
             </div>
-          ) : (
-            // Grid View (Original)
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {filteredPosts.map((post) => (
-                <div
-                  key={post.id}
-                  className={`border rounded-lg overflow-hidden hover:shadow-lg transition-all ${
-                    selectedPosts.includes(post.id)
-                      ? "ring-2 ring-blue-500"
-                      : ""
-                  }`}
-                >
-                  {/* Checkbox - Top Right Corner */}
-                  <div className="relative">
-                    <div className="absolute top-2 left-2 z-10">
-                      <input
-                        type="checkbox"
-                        checked={selectedPosts.includes(post.id)}
-                        onChange={() => handleSelectPost(post.id)}
-                        className="h-5 w-5 text-blue-600 rounded border-gray-300 focus:ring-2 focus:ring-blue-500 cursor-pointer bg-white shadow-sm"
-                        aria-label={`Select post: ${post.title}`}
-                      />
-                    </div>
 
-                    {/* Post Image - Smaller height */}
-                    <div className="relative h-40 bg-gray-200">
-                      {post.image ? (
-                        <Image
-                          src={post.image}
-                          alt={post.title}
-                          fill
-                          className="object-cover"
-                          sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
-                        />
-                      ) : (
-                        <div className="flex items-center justify-center h-full">
-                          <ImageIcon className="h-12 w-12 text-gray-400" />
-                        </div>
-                      )}
-                    </div>
-                  </div>
-
-                  {/* Post Details */}
-                  <div className="p-4 space-y-3">
-                    {/* Title and Status */}
-                    <div className="flex items-start justify-between gap-2">
-                      <h3 className="font-semibold text-gray-900 line-clamp-2">
-                        {post.title}
-                      </h3>
-                      {post.posted ? (
-                        <span className="flex-shrink-0 px-2 py-1 text-xs font-semibold rounded-full bg-green-100 text-green-800">
-                          <CheckCircle className="h-3 w-3 inline mr-1" />
-                          Posted
-                        </span>
-                      ) : (
-                        <span className="flex-shrink-0 px-2 py-1 text-xs font-semibold rounded-full bg-orange-100 text-orange-800">
-                          <XCircle className="h-3 w-3 inline mr-1" />
-                          Pending
-                        </span>
-                      )}
-                    </div>
-
-                    {/* Description */}
-                    <p className="text-sm text-gray-600 line-clamp-2">
-                      {post.description}
-                    </p>
-
-                    {/* Price */}
-                    <div className="flex items-center gap-2 text-lg font-bold text-blue-600">
-                      <DollarSign className="h-5 w-5" />
-                      {post.price}
-                    </div>
-
-                    {/* Account Email */}
-                    <div className="text-xs text-gray-500 truncate">
-                      Account: {post.account_email}
-                    </div>
-
-                    {/* Scheduled Time */}
-                    <div className="flex items-center gap-2 text-xs text-gray-500">
-                      <Calendar className="h-4 w-4" />
-                      {new Date(post.scheduled_time).toLocaleString()}
-                    </div>
-
-                    {/* Actions */}
-                    <div className="flex gap-2 pt-2 border-t">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        className="flex-1"
-                        onClick={() => handleEdit(post)}
-                      >
-                        <Edit size={16} className="mr-1" />
-                        Edit
-                      </Button>
-                      <Button
-                        variant="destructive"
-                        size="sm"
-                        className="flex-1"
-                        onClick={() => handleDelete(post.id)}
-                      >
-                        <Trash2 size={16} className="mr-1" />
-                        Delete
-                      </Button>
-                    </div>
-                  </div>
-                </div>
-              ))}
+            {/* Action Buttons - Below Posted Items - Fixed to Bottom */}
+            <div className="flex gap-2 mt-4 pt-4 border-t flex-shrink-0">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleSelectAllPosted}
+                className="flex-1"
+                disabled={posts.filter((p) => p.posted).length === 0}
+              >
+                {selectedPostedItems.length ===
+                posts.filter((p) => p.posted).length
+                  ? "Deselect All"
+                  : "Select All"}
+              </Button>
+              <Button
+                variant="destructive"
+                size="sm"
+                onClick={handleDeleteSelectedPosted}
+                className="flex-1"
+                disabled={posts.filter((p) => p.posted).length === 0}
+              >
+                <Trash2 className="h-4 w-4 mr-2" />
+                Delete
+                {selectedPostedItems.length > 0 &&
+                  ` (${selectedPostedItems.length})`}
+              </Button>
             </div>
-          )}
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Logs Section - BELOW THE TWO BOXES */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Activity Logs</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="space-y-2 max-h-[300px] overflow-y-auto">
+            {activityLogs.length === 0 ? (
+              <div className="text-sm text-gray-500 text-center py-4">
+                No activity yet. Create, edit, or post items to see logs here.
+              </div>
+            ) : (
+              activityLogs.map((log) => {
+                // Determine border color based on log type
+                const borderColor =
+                  {
+                    create: "border-blue-500",
+                    edit: "border-yellow-500",
+                    delete: "border-red-500",
+                    post: "border-green-500",
+                    bulk: "border-orange-500",
+                    account: "border-purple-500",
+                  }[log.type] || "border-gray-500";
+
+                // Format timestamp
+                const timeAgo = (() => {
+                  const now = new Date();
+                  const diff = now.getTime() - log.timestamp.getTime();
+                  const minutes = Math.floor(diff / 60000);
+                  const hours = Math.floor(diff / 3600000);
+                  const days = Math.floor(diff / 86400000);
+
+                  if (minutes < 1) return "Just now";
+                  if (minutes < 60)
+                    return `${minutes} minute${minutes > 1 ? "s" : ""} ago`;
+                  if (hours < 24)
+                    return `${hours} hour${hours > 1 ? "s" : ""} ago`;
+                  return `${days} day${days > 1 ? "s" : ""} ago`;
+                })();
+
+                return (
+                  <div
+                    key={log.id}
+                    className={`text-sm text-gray-600 border-l-4 ${borderColor} pl-3 py-2`}
+                  >
+                    <div className="flex items-center justify-between">
+                      <span className="font-medium">{log.message}</span>
+                      <span className="text-xs text-gray-400">{timeAgo}</span>
+                    </div>
+                    <p className="text-xs text-gray-500 mt-1">{log.details}</p>
+                  </div>
+                );
+              })
+            )}
+          </div>
         </CardContent>
       </Card>
     </div>
