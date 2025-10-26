@@ -232,7 +232,7 @@ export default function CreatePostModal({
             {/* Account Selection - Multiple */}
             <div>
               <div className="flex items-center justify-between mb-2">
-                <label className="block text-sm font-medium text-gray-700">
+                <label className="block text-sm font-semibold text-gray-900">
                   Facebook Accounts <span className="text-red-500">*</span>
                 </label>
                 {accounts.length > 0 && (
@@ -265,7 +265,7 @@ export default function CreatePostModal({
                         onChange={() => handleAccountToggle(account.id)}
                         className="h-4 w-4 text-blue-600 rounded border-gray-300 focus:ring-2 focus:ring-blue-500"
                       />
-                      <span className="ml-3 flex-1 text-sm">
+                      <span className="ml-3 flex-1 text-sm font-medium text-gray-900">
                         {account.email}
                       </span>
                       {account.session_exists ? (
@@ -292,7 +292,7 @@ export default function CreatePostModal({
 
             {/* Title */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
+              <label className="block text-sm font-semibold text-gray-900 mb-2">
                 Title <span className="text-red-500">*</span>
               </label>
               <input
@@ -301,7 +301,7 @@ export default function CreatePostModal({
                 value={formData.title}
                 onChange={handleInputChange}
                 placeholder="e.g., iPhone 13 Pro - 256GB"
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                className="w-full px-3 py-2 text-sm text-gray-900 border border-gray-400 rounded-lg placeholder:text-gray-500 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                 maxLength={255}
                 required
               />
@@ -312,7 +312,7 @@ export default function CreatePostModal({
 
             {/* Description */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
+              <label className="block text-sm font-semibold text-gray-900 mb-2">
                 Description <span className="text-red-500">*</span>
               </label>
               <textarea
@@ -320,7 +320,7 @@ export default function CreatePostModal({
                 value={formData.description}
                 onChange={handleInputChange}
                 placeholder="Describe your item in detail..."
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                className="w-full px-3 py-2 text-sm text-gray-900 border border-gray-400 rounded-lg placeholder:text-gray-500 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                 rows={4}
                 required
               />
@@ -331,7 +331,7 @@ export default function CreatePostModal({
 
             {/* Price */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
+              <label className="block text-sm font-semibold text-gray-900 mb-2">
                 Price ($) <span className="text-red-500">*</span>
               </label>
               <input
@@ -342,7 +342,7 @@ export default function CreatePostModal({
                 placeholder="0.00"
                 step="0.01"
                 min="0.01"
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                className="w-full px-3 py-2 text-sm text-gray-900 border border-gray-400 rounded-lg placeholder:text-gray-500 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                 required
               />
             </div>

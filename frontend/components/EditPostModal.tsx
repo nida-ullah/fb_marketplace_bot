@@ -212,14 +212,14 @@ export default function EditPostModal({
           <div className="space-y-4">
             {/* Account Selection */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
+              <label className="block text-sm font-semibold text-gray-900 mb-2">
                 Facebook Account <span className="text-red-500">*</span>
               </label>
               <select
                 name="account"
                 value={formData.account}
                 onChange={handleInputChange}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                className="w-full px-3 py-2 text-sm text-gray-900 border border-gray-400 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                 required
                 aria-label="Select Facebook account"
               >
@@ -235,7 +235,7 @@ export default function EditPostModal({
 
             {/* Title */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
+              <label className="block text-sm font-semibold text-gray-900 mb-2">
                 Title <span className="text-red-500">*</span>
               </label>
               <input
@@ -244,7 +244,7 @@ export default function EditPostModal({
                 value={formData.title}
                 onChange={handleInputChange}
                 placeholder="e.g., iPhone 13 Pro - 256GB"
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                className="w-full px-3 py-2 text-sm text-gray-900 border border-gray-400 rounded-lg placeholder:text-gray-500 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                 maxLength={255}
                 required
               />
@@ -255,7 +255,7 @@ export default function EditPostModal({
 
             {/* Description */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
+              <label className="block text-sm font-semibold text-gray-900 mb-2">
                 Description <span className="text-red-500">*</span>
               </label>
               <textarea
@@ -263,7 +263,7 @@ export default function EditPostModal({
                 value={formData.description}
                 onChange={handleInputChange}
                 placeholder="Describe your item in detail..."
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                className="w-full px-3 py-2 text-sm text-gray-900 border border-gray-400 rounded-lg placeholder:text-gray-500 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                 rows={4}
                 required
               />
@@ -274,7 +274,7 @@ export default function EditPostModal({
 
             {/* Price */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
+              <label className="block text-sm font-semibold text-gray-900 mb-2">
                 Price ($) <span className="text-red-500">*</span>
               </label>
               <input
@@ -285,7 +285,7 @@ export default function EditPostModal({
                 placeholder="0.00"
                 step="0.01"
                 min="0.01"
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                className="w-full px-3 py-2 text-sm text-gray-900 border border-gray-400 rounded-lg placeholder:text-gray-500 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                 required
               />
             </div>
@@ -300,14 +300,17 @@ export default function EditPostModal({
                 onChange={handleInputChange}
                 className="h-4 w-4 text-blue-600 rounded border-gray-300 focus:ring-2 focus:ring-blue-500"
               />
-              <label htmlFor="posted" className="ml-2 text-sm text-gray-700">
+              <label
+                htmlFor="posted"
+                className="ml-2 text-sm font-medium text-gray-900"
+              >
                 Mark as Posted
               </label>
             </div>
 
             {/* Image Upload */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
+              <label className="block text-sm font-semibold text-gray-900 mb-2">
                 Product Image
               </label>
 
