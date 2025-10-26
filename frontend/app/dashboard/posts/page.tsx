@@ -507,7 +507,7 @@ export default function PostsPage() {
           <h1 className="text-3xl font-bold text-gray-900">
             Marketplace Posts
           </h1>
-          <p className="text-gray-600 mt-1">
+          <p className="text-gray-700 mt-1">
             Manage your Facebook Marketplace listings
           </p>
         </div>
@@ -534,40 +534,46 @@ export default function PostsPage() {
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total Posts</CardTitle>
-            <Package className="h-4 w-4 text-muted-foreground" />
+            <CardTitle className="text-sm font-semibold text-gray-700">
+              Total Posts
+            </CardTitle>
+            <Package className="h-4 w-4 text-gray-600" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{stats.total}</div>
-            <p className="text-xs text-muted-foreground">
-              All marketplace listings
-            </p>
+            <div className="text-2xl font-bold text-gray-900">
+              {stats.total}
+            </div>
+            <p className="text-xs text-gray-600">All marketplace listings</p>
           </CardContent>
         </Card>
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Posted</CardTitle>
+            <CardTitle className="text-sm font-semibold text-gray-700">
+              Posted
+            </CardTitle>
             <CheckCircle className="h-4 w-4 text-green-600" />
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-green-600">
               {stats.posted}
             </div>
-            <p className="text-xs text-muted-foreground">Successfully posted</p>
+            <p className="text-xs text-gray-600">Successfully posted</p>
           </CardContent>
         </Card>
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Pending</CardTitle>
+            <CardTitle className="text-sm font-semibold text-gray-700">
+              Pending
+            </CardTitle>
             <XCircle className="h-4 w-4 text-orange-600" />
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-orange-600">
               {stats.pending}
             </div>
-            <p className="text-xs text-muted-foreground">Awaiting posting</p>
+            <p className="text-xs text-gray-600">Awaiting posting</p>
           </CardContent>
         </Card>
       </div>
@@ -578,7 +584,7 @@ export default function PostsPage() {
         <Card className="flex flex-col h-[650px]">
           <CardHeader>
             <div className="flex items-center justify-between">
-              <CardTitle className="flex items-center gap-2">
+              <CardTitle className="flex items-center gap-2 text-gray-900">
                 <XCircle className="h-5 w-5 text-orange-600" />
                 Pending Posts ({stats.pending})
               </CardTitle>
@@ -628,10 +634,10 @@ export default function PostsPage() {
                           )}
                         </div>
                         <div className="flex-1 min-w-0">
-                          <h4 className="font-semibold text-sm truncate">
+                          <h4 className="font-semibold text-sm text-gray-900 truncate">
                             {post.title}
                           </h4>
-                          <p className="text-xs text-gray-500 line-clamp-1">
+                          <p className="text-xs text-gray-600 line-clamp-1">
                             {post.description}
                           </p>
                           <div className="flex items-center gap-2 mt-1">
@@ -639,13 +645,13 @@ export default function PostsPage() {
                               ${post.price}
                             </span>
                             <span className="text-xs text-gray-400">•</span>
-                            <span className="text-xs text-gray-500">
+                            <span className="text-xs text-gray-600">
                               {new Date(
                                 post.scheduled_time
                               ).toLocaleDateString()}
                             </span>
                           </div>
-                          <div className="text-xs text-gray-600 mt-1 truncate">
+                          <div className="text-xs text-gray-700 mt-1 truncate">
                             <span className="font-medium">Account:</span>{" "}
                             {post.account_email}
                           </div>
@@ -717,7 +723,7 @@ export default function PostsPage() {
         <Card className="flex flex-col h-[650px]">
           <CardHeader>
             <div className="flex items-center justify-between">
-              <CardTitle className="flex items-center gap-2">
+              <CardTitle className="flex items-center gap-2 text-gray-900">
                 <CheckCircle className="h-5 w-5 text-green-600" />
                 Posted ({stats.posted})
               </CardTitle>
@@ -767,10 +773,10 @@ export default function PostsPage() {
                           )}
                         </div>
                         <div className="flex-1 min-w-0">
-                          <h4 className="font-semibold text-sm truncate">
+                          <h4 className="font-semibold text-sm text-gray-900 truncate">
                             {post.title}
                           </h4>
-                          <p className="text-xs text-gray-500 line-clamp-1">
+                          <p className="text-xs text-gray-600 line-clamp-1">
                             {post.description}
                           </p>
                           <div className="flex items-center gap-2 mt-1">
@@ -778,13 +784,13 @@ export default function PostsPage() {
                               ${post.price}
                             </span>
                             <span className="text-xs text-gray-400">•</span>
-                            <span className="text-xs text-gray-500">
+                            <span className="text-xs text-gray-600">
                               {new Date(
                                 post.scheduled_time
                               ).toLocaleDateString()}
                             </span>
                           </div>
-                          <div className="text-xs text-gray-600 mt-1 truncate">
+                          <div className="text-xs text-gray-700 mt-1 truncate">
                             <span className="font-medium">Account:</span>{" "}
                             {post.account_email}
                           </div>

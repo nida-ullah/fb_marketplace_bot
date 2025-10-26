@@ -3,7 +3,7 @@
 import { useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/hooks/useAuth";
-import { Sidebar } from "@/components/ui/Sidebar";
+import { Header } from "@/components/ui/Header";
 
 export default function DashboardLayout({
   children,
@@ -35,16 +35,14 @@ export default function DashboardLayout({
   }
 
   return (
-    <div className="flex h-screen overflow-hidden bg-gray-50">
-      {/* Sidebar */}
-      <div className="hidden md:flex md:w-64 md:flex-col">
-        <Sidebar />
-      </div>
+    <div className="min-h-screen bg-gray-50">
+      {/* Header - Sticky at top */}
+      <Header />
 
       {/* Main Content */}
-      <div className="flex flex-1 flex-col overflow-hidden">
-        <main className="flex-1 overflow-y-auto p-6">{children}</main>
-      </div>
+      <main className="container mx-auto px-4 sm:px-6 lg:px-8 py-6">
+        {children}
+      </main>
     </div>
   );
 }

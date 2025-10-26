@@ -81,7 +81,7 @@ export default function DashboardPage() {
       {/* Header */}
       <div>
         <h1 className="text-3xl font-bold text-gray-900">Dashboard</h1>
-        <p className="mt-2 text-sm text-gray-600">
+        <p className="mt-2 text-sm text-gray-700">
           Welcome back! Here&apos;s an overview of your marketplace automation.
         </p>
       </div>
@@ -91,7 +91,7 @@ export default function DashboardPage() {
         {statCards.map((stat) => (
           <Card key={stat.title}>
             <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium text-gray-600">
+              <CardTitle className="text-sm font-semibold text-gray-700">
                 {stat.title}
               </CardTitle>
               <div className={`rounded-full p-2 ${stat.bgColor}`}>
@@ -99,7 +99,15 @@ export default function DashboardPage() {
               </div>
             </CardHeader>
             <CardContent>
-              <div className="text-3xl font-bold">{stat.value}</div>
+              <div className="text-3xl font-bold text-gray-900">
+                {stat.value}
+              </div>
+              <p className="text-xs text-gray-600 mt-1">
+                {stat.title === "Total Accounts" && "All marketplace listings"}
+                {stat.title === "Total Posts" && "All marketplace listings"}
+                {stat.title === "Pending Posts" && "Awaiting posting"}
+                {stat.title === "Posted Today" && "Successfully posted"}
+              </p>
             </CardContent>
           </Card>
         ))}
@@ -108,7 +116,7 @@ export default function DashboardPage() {
       {/* Success Rate Card */}
       <Card>
         <CardHeader>
-          <CardTitle>Success Rate</CardTitle>
+          <CardTitle className="text-gray-900">Success Rate</CardTitle>
         </CardHeader>
         <CardContent>
           <div className="flex items-center gap-4">
@@ -124,7 +132,7 @@ export default function DashboardPage() {
               </div>
             </div>
           </div>
-          <p className="mt-2 text-sm text-gray-600">
+          <p className="mt-2 text-sm text-gray-700">
             Overall posting success rate across all accounts
           </p>
         </CardContent>
@@ -133,7 +141,7 @@ export default function DashboardPage() {
       {/* Quick Actions */}
       <Card>
         <CardHeader>
-          <CardTitle>Quick Actions</CardTitle>
+          <CardTitle className="text-gray-900">Quick Actions</CardTitle>
         </CardHeader>
         <CardContent>
           <div className="grid gap-4 md:grid-cols-3">
@@ -142,21 +150,23 @@ export default function DashboardPage() {
               className="flex flex-col items-center justify-center rounded-lg border-2 border-dashed border-gray-300 p-6 transition-colors hover:border-blue-600 hover:bg-blue-50"
             >
               <Users className="h-8 w-8 text-blue-600 mb-2" />
-              <span className="font-medium">Manage Accounts</span>
+              <span className="font-semibold text-gray-900">
+                Manage Accounts
+              </span>
             </a>
             <a
               href="/dashboard/posts"
               className="flex flex-col items-center justify-center rounded-lg border-2 border-dashed border-gray-300 p-6 transition-colors hover:border-green-600 hover:bg-green-50"
             >
               <FileText className="h-8 w-8 text-green-600 mb-2" />
-              <span className="font-medium">View Posts</span>
+              <span className="font-semibold text-gray-900">View Posts</span>
             </a>
             <a
               href="/dashboard/settings"
               className="flex flex-col items-center justify-center rounded-lg border-2 border-dashed border-gray-300 p-6 transition-colors hover:border-purple-600 hover:bg-purple-50"
             >
               <Settings className="h-8 w-8 text-purple-600 mb-2" />
-              <span className="font-medium">Settings</span>
+              <span className="font-semibold text-gray-900">Settings</span>
             </a>
           </div>
         </CardContent>

@@ -175,7 +175,7 @@ export default function AccountsPage() {
           <h1 className="text-3xl font-bold text-gray-900">
             Facebook Accounts
           </h1>
-          <p className="text-gray-600 mt-1">
+          <p className="text-gray-700 mt-1">
             Manage your Facebook accounts for marketplace automation
           </p>
         </div>
@@ -209,41 +209,48 @@ export default function AccountsPage() {
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium text-gray-600">
+            <CardTitle className="text-sm font-semibold text-gray-700">
               Total Accounts
             </CardTitle>
             <Users className="h-5 w-5 text-blue-600" />
           </CardHeader>
           <CardContent>
-            <div className="text-3xl font-bold">{accounts.length}</div>
+            <div className="text-3xl font-bold text-gray-900">
+              {accounts.length}
+            </div>
+            <p className="text-xs text-gray-600 mt-1">
+              All registered accounts
+            </p>
           </CardContent>
         </Card>
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium text-gray-600">
+            <CardTitle className="text-sm font-semibold text-gray-700">
               Active Sessions
             </CardTitle>
             <CheckCircle className="h-5 w-5 text-green-600" />
           </CardHeader>
           <CardContent>
-            <div className="text-3xl font-bold">
+            <div className="text-3xl font-bold text-green-700">
               {accounts.filter((acc) => acc.session_exists).length}
             </div>
+            <p className="text-xs text-gray-600 mt-1">Ready to post</p>
           </CardContent>
         </Card>
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium text-gray-600">
+            <CardTitle className="text-sm font-semibold text-gray-700">
               No Session
             </CardTitle>
             <XCircle className="h-5 w-5 text-red-600" />
           </CardHeader>
           <CardContent>
-            <div className="text-3xl font-bold">
+            <div className="text-3xl font-bold text-red-700">
               {accounts.filter((acc) => !acc.session_exists).length}
             </div>
+            <p className="text-xs text-gray-600 mt-1">Requires login</p>
           </CardContent>
         </Card>
       </div>
@@ -253,7 +260,7 @@ export default function AccountsPage() {
         <CardHeader>
           <div className="flex items-center justify-between">
             <div className="flex flex-col gap-2">
-              <CardTitle>All Accounts</CardTitle>
+              <CardTitle className="text-gray-900">All Accounts</CardTitle>
               {accounts.length > 0 && (
                 <Button
                   variant="outline"
@@ -271,7 +278,7 @@ export default function AccountsPage() {
             {/* Bulk Actions - Right Side */}
             {selectedAccounts.length > 0 && (
               <div className="flex items-center gap-3">
-                <span className="text-sm font-medium text-gray-700">
+                <span className="text-sm font-semibold text-gray-900">
                   {selectedAccounts.length} selected
                 </span>
                 <Button
@@ -303,11 +310,11 @@ export default function AccountsPage() {
               <h3 className="mt-2 text-sm font-semibold text-gray-900">
                 No accounts
               </h3>
-              <p className="mt-1 text-sm text-gray-500">
+              <p className="mt-1 text-sm text-gray-600">
                 Get started by adding a Facebook account.
               </p>
               <div className="mt-6">
-                <Button>
+                <Button onClick={() => setIsModalOpen(true)}>
                   <Plus size={20} className="mr-2" />
                   Add Account
                 </Button>
@@ -318,19 +325,19 @@ export default function AccountsPage() {
               <table className="w-full">
                 <thead className="bg-gray-50">
                   <tr>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-12">
+                    <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider w-12">
                       {/* Checkbox column header - empty for safety */}
                     </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">
                       Email
                     </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">
                       Session Status
                     </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">
                       Created At
                     </th>
-                    <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    <th className="px-6 py-3 text-right text-xs font-semibold text-gray-700 uppercase tracking-wider">
                       Actions
                     </th>
                   </tr>
@@ -379,7 +386,7 @@ export default function AccountsPage() {
                           </span>
                         )}
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">
                         {new Date(account.created_at).toLocaleDateString()}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">

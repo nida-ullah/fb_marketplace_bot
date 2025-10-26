@@ -6,21 +6,34 @@ export default function Home() {
   return (
     <div className="min-h-screen bg-gradient-to-b from-blue-50 to-white">
       {/* Sticky Header (visible on scroll) */}
-      <header className="sticky top-0 z-50 bg-white/80 backdrop-blur supports-[backdrop-filter]:bg-white/60 border-b border-gray-200">
-        <div className="container mx-auto px-4 py-4">
-          <nav className="flex items-center justify-between">
-            <div className="text-2xl font-bold text-blue-600">
-              FB Marketplace Bot
+      {/* Header */}
+      <header className="sticky top-0 z-50 bg-white border-b border-gray-200 shadow-sm">
+        <div className="container mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="flex h-16 items-center justify-between">
+            {/* Left Section: Logo */}
+            <div className="flex items-center">
+              <div className="text-xl font-bold text-blue-600">
+                FB Marketplace Bot
+              </div>
             </div>
-            <div className="flex gap-3 sm:gap-4">
+
+            {/* Right Section: Action Buttons */}
+            <div className="flex items-center gap-3">
               <Link href="/login">
-                <Button variant="ghost">Sign In</Button>
+                <Button
+                  variant="ghost"
+                  className="text-gray-700 hover:text-gray-900 hover:bg-gray-100"
+                >
+                  Sign In
+                </Button>
               </Link>
               <Link href="/signup">
-                <Button>Get Started</Button>
+                <Button className="bg-blue-600 hover:bg-blue-700 text-white">
+                  Get Started
+                </Button>
               </Link>
             </div>
-          </nav>
+          </div>
         </div>
       </header>
 
