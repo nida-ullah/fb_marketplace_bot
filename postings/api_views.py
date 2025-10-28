@@ -18,15 +18,16 @@ from django.utils import timezone
 
 class MarketplacePostListCreateView(generics.ListCreateAPIView):
     """List all marketplace posts or create a new one"""
-    queryset = MarketplacePost.objects.all()
     serializer_class = MarketplacePostSerializer
     permission_classes = [IsAuthenticated]
 
     def get_queryset(self):
-        """Optionally filter by status - optimized with select_related"""
+        """Filter posts by current user's accounts - optimized with select_related"""
         # Use select_related to fetch account data in a single query (reduces N+1 queries)
-        queryset = MarketplacePost.objects.select_related(
-            'account').order_by('-created_at')
+        queryset = MarketplacePost.objects.filter(
+            account__user=self.request.user
+        ).select_related('account').order_by('-created_at')
+
         status = self.request.query_params.get('status', None)
         if status:
             queryset = queryset.filter(status=status)
@@ -89,10 +90,14 @@ class MarketplacePostListCreateView(generics.ListCreateAPIView):
 
 class MarketplacePostDetailView(generics.RetrieveUpdateDestroyAPIView):
     """Retrieve, update or delete a marketplace post"""
-    # Optimized queryset with select_related to reduce queries
-    queryset = MarketplacePost.objects.select_related('account')
     serializer_class = MarketplacePostSerializer
     permission_classes = [IsAuthenticated]
+
+    def get_queryset(self):
+        """Only allow users to access posts from their own accounts"""
+        return MarketplacePost.objects.filter(
+            account__user=self.request.user
+        ).select_related('account')
 
     def destroy(self, request, *args, **kwargs):
         """Override delete to invalidate caches"""
@@ -184,9 +189,12 @@ class BulkUploadPostsView(APIView):
                 status=status.HTTP_400_BAD_REQUEST
             )
 
-        # Get selected accounts
+        # Get selected accounts - only from current user
         try:
-            accounts = FacebookAccount.objects.filter(id__in=account_ids)
+            accounts = FacebookAccount.objects.filter(
+                id__in=account_ids,
+                user=request.user  # Only allow user's own accounts
+            )
             if not accounts.exists():
                 return Response(
                     {'error': 'No valid accounts found'},
@@ -352,11 +360,12 @@ class StartPostingView(APIView):
                 status=status.HTTP_400_BAD_REQUEST
             )
 
-        # Filter only pending posts - optimized with select_related
+        # Filter only pending posts from user's accounts - optimized with select_related
         try:
             pending_posts = MarketplacePost.objects.select_related('account').filter(
                 id__in=post_ids,
-                posted=False
+                posted=False,
+                account__user=request.user  # Only allow posting from user's own accounts
             )
 
             if not pending_posts.exists():

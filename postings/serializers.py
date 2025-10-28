@@ -10,7 +10,7 @@ class MarketplacePostSerializer(serializers.ModelSerializer):
     # Account ID for write operations
     account_id = serializers.PrimaryKeyRelatedField(
         source='account',
-        queryset=FacebookAccount.objects.all(),
+        queryset=FacebookAccount.objects.none(),  # Will be set dynamically
         write_only=True,
         required=False
     )
@@ -23,6 +23,15 @@ class MarketplacePostSerializer(serializers.ModelSerializer):
     image = serializers.ImageField(required=False)
     scheduled_time = serializers.DateTimeField(required=False)
     status = serializers.CharField(required=False)
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        # Dynamically set queryset based on the request user
+        request = self.context.get('request')
+        if request and hasattr(request, 'user'):
+            self.fields['account_id'].queryset = FacebookAccount.objects.filter(
+                user=request.user
+            )
 
     class Meta:
         model = MarketplacePost

@@ -85,22 +85,25 @@ def dashboard_stats(request):
     """Get dashboard statistics - optimized with caching and aggregation"""
     from django.db.models import Count, Q
 
-    # Try to get from cache first
-    cache_key = 'dashboard_stats'
+    # Cache key unique to each user
+    cache_key = f'dashboard_stats_user_{request.user.id}'
     cached_stats = cache.get(cache_key)
 
     if cached_stats:
         return Response(cached_stats)
 
+    # Filter posts and accounts by current user
+    user_posts = MarketplacePost.objects.filter(account__user=request.user)
+
     # Use aggregation for better performance with status field
-    stats = MarketplacePost.objects.aggregate(
+    stats = user_posts.aggregate(
         total_posts=Count('id'),
         pending_posts=Count('id', filter=Q(status='pending')),
         posted_posts=Count('id', filter=Q(status='posted')),
         failed_posts=Count('id', filter=Q(status='failed'))
     )
 
-    total_accounts = FacebookAccount.objects.count()
+    total_accounts = FacebookAccount.objects.filter(user=request.user).count()
 
     # Calculate success rate
     total_posts = stats['total_posts']
@@ -123,17 +126,28 @@ def dashboard_stats(request):
 
 class FacebookAccountListCreateView(generics.ListCreateAPIView):
     """List all Facebook accounts or create a new one - optimized with prefetch_related"""
-    queryset = FacebookAccount.objects.prefetch_related(
-        'marketplacepost_set').all().order_by('-created_at')
     serializer_class = FacebookAccountSerializer
     permission_classes = [IsAuthenticated]
+
+    def get_queryset(self):
+        """Filter accounts by current user"""
+        return FacebookAccount.objects.filter(
+            user=self.request.user
+        ).prefetch_related('marketplacepost_set').order_by('-created_at')
+
+    def perform_create(self, serializer):
+        """Automatically set the user when creating an account"""
+        serializer.save(user=self.request.user)
 
 
 class FacebookAccountDetailView(generics.RetrieveUpdateDestroyAPIView):
     """Retrieve, update or delete a Facebook account"""
-    queryset = FacebookAccount.objects.all()
     serializer_class = FacebookAccountSerializer
     permission_classes = [IsAuthenticated]
+
+    def get_queryset(self):
+        """Only allow users to access their own accounts"""
+        return FacebookAccount.objects.filter(user=self.request.user)
 
     def delete(self, request, *args, **kwargs):
         """Override delete to also remove session file"""
@@ -163,15 +177,16 @@ def add_facebook_account_with_login(request):
             status=status.HTTP_400_BAD_REQUEST
         )
 
-    # Check if account already exists
-    if FacebookAccount.objects.filter(email=email).exists():
+    # Check if account already exists for this user
+    if FacebookAccount.objects.filter(email=email, user=request.user).exists():
         return Response(
             {'error': 'Account with this email already exists'},
             status=status.HTTP_400_BAD_REQUEST
         )
 
-    # Create account in database
+    # Create account in database with user association
     account = FacebookAccount.objects.create(
+        user=request.user,
         email=email,
         password=password
     )
@@ -260,13 +275,14 @@ def bulk_upload_accounts_with_login(request):
                     })
                     continue
 
-                # Check if account already exists
-                if FacebookAccount.objects.filter(email=email).exists():
+                # Check if account already exists for this user
+                if FacebookAccount.objects.filter(email=email, user=request.user).exists():
                     accounts_skipped.append(email)
                     continue
 
-                # Create account in database
+                # Create account in database with user association
                 account = FacebookAccount.objects.create(
+                    user=request.user,
                     email=email,
                     password=password
                 )
@@ -325,7 +341,8 @@ def update_account_session(request, pk):
     Used when session expires or doesn't exist.
     """
     try:
-        account = FacebookAccount.objects.get(pk=pk)
+        # Only allow users to update their own accounts
+        account = FacebookAccount.objects.get(pk=pk, user=request.user)
 
         # Start browser automation in background thread
         def update_session():
