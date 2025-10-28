@@ -47,8 +47,21 @@ export const authAPI = {
   login: (email: string, password: string) =>
     api.post("/auth/login/", { email, password }),
 
-  signup: (email: string, password: string, name: string) =>
-    api.post("/auth/register/", { email, password, name }),
+  signup: (
+    username: string,
+    email: string,
+    password: string,
+    firstName?: string,
+    lastName?: string
+  ) =>
+    api.post("/auth/register/", {
+      username,
+      email,
+      password,
+      confirm_password: password,
+      first_name: firstName || "",
+      last_name: lastName || "",
+    }),
 
   logout: () => api.post("/auth/logout/"),
 

@@ -70,7 +70,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const signup = async (name: string, email: string, password: string) => {
     try {
-      const response = await authAPI.signup(email, password, name);
+      // Split name into first and last name
+      const nameParts = name.trim().split(" ");
+      const firstName = nameParts[0] || "";
+      const lastName = nameParts.slice(1).join(" ") || "";
+
+      // Generate username from email (part before @)
+      const username = email.split("@")[0];
+
+      const response = await authAPI.signup(
+        username,
+        email,
+        password,
+        firstName,
+        lastName
+      );
       const { tokens, user } = response.data;
 
       // Save access token to localStorage
@@ -80,7 +94,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setUser(user);
       router.push("/dashboard");
     } catch (error: any) {
-      throw new Error(error.response?.data?.error || "Signup failed");
+      const errorMessage =
+        error.response?.data?.username?.[0] ||
+        error.response?.data?.email?.[0] ||
+        error.response?.data?.password?.[0] ||
+        error.response?.data?.error ||
+        "Signup failed";
+      throw new Error(errorMessage);
     }
   };
 
