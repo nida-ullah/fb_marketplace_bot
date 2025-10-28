@@ -5,22 +5,14 @@ import { Button } from "./ui/Button";
 import { X, Upload } from "lucide-react";
 import { postsAPI, accountsAPI } from "@/lib/api";
 import Image from "next/image";
+import type { MarketplacePost } from "@/types";
 
 interface EditPostModalProps {
   isOpen: boolean;
   onClose: () => void;
   onSuccess: () => void;
   onToast?: (type: "success" | "error", message: string) => void;
-  post: {
-    id: number;
-    title: string;
-    description: string;
-    price: string;
-    image: string;
-    account: number;
-    account_email: string;
-    posted: boolean;
-  } | null;
+  post: MarketplacePost | null;
 }
 
 interface FacebookAccount {
@@ -55,11 +47,12 @@ export default function EditPostModal({
       setFormData({
         title: post.title,
         description: post.description,
-        price: post.price,
-        account: post.account,
-        posted: post.posted,
+        price: String(post.price),
+        account:
+          typeof post.account === "object" ? post.account.id : post.account,
+        posted: post.status === "posted",
       });
-      setImagePreview(post.image);
+      setImagePreview(post.image || "");
       setImage(null);
       fetchAccounts();
     }
@@ -190,7 +183,10 @@ export default function EditPostModal({
         {/* Header */}
         <div className="flex items-center justify-between p-6 border-b border-gray-200 sticky top-0 bg-white z-10">
           <h2 className="text-2xl font-bold text-gray-900">
-            Edit Post - {post.account_email}
+            Edit Post -{" "}
+            {typeof post.account === "object"
+              ? post.account.email
+              : "Unknown Account"}
           </h2>
           <button
             onClick={onClose}
@@ -341,7 +337,7 @@ export default function EditPostModal({
                       size="sm"
                       onClick={() => {
                         setImage(null);
-                        setImagePreview(post.image);
+                        setImagePreview(post.image || "");
                       }}
                     >
                       Cancel Change

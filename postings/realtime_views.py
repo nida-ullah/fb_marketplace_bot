@@ -139,8 +139,8 @@ def health_check_accounts(request):
         session_file = f"sessions/{account.email.replace('@', '_').replace('.', '_')}.json"
         session_exists = os.path.exists(session_file)
 
-        # Check if session file is recent (less than 30 days old)
-        session_valid = False
+        # Check if session file is recent (DISABLED - Keep sessions forever)
+        session_valid = session_exists  # Session is always valid if it exists
         session_age_days = None
 
         if session_exists:
@@ -148,7 +148,7 @@ def health_check_accounts(request):
             file_modified = os.path.getmtime(session_file)
             age_seconds = time.time() - file_modified
             session_age_days = round(age_seconds / 86400, 1)  # Convert to days
-            session_valid = session_age_days < 30  # Consider valid if less than 30 days
+            # No age limit - session valid forever as long as file exists
 
         # Get post statistics for this account
         from .models import MarketplacePost
@@ -219,13 +219,14 @@ def validate_account_session(request, account_id):
             with open(session_file, 'r') as f:
                 session_data = json.load(f)
 
-            session_valid = age_days < 30 and 'cookies' in session_data
+            # Session is valid if file exists and has cookies (no age limit)
+            session_valid = 'cookies' in session_data
 
             return Response({
                 'valid': session_valid,
                 'session_age_days': age_days,
-                'message': 'Session is valid' if session_valid else 'Session may be expired',
-                'action_required': None if session_valid else 'Consider updating session'
+                'message': 'Session is valid (kept forever)' if session_valid else 'Session file missing cookies',
+                'action_required': None if session_valid else 'Please update session for this account'
             })
 
         except json.JSONDecodeError:

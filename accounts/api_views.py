@@ -92,11 +92,12 @@ def dashboard_stats(request):
     if cached_stats:
         return Response(cached_stats)
 
-    # Use aggregation for better performance (single query instead of 4)
+    # Use aggregation for better performance with status field
     stats = MarketplacePost.objects.aggregate(
         total_posts=Count('id'),
-        pending_posts=Count('id', filter=Q(posted=False)),
-        posted_posts=Count('id', filter=Q(posted=True))
+        pending_posts=Count('id', filter=Q(status='pending')),
+        posted_posts=Count('id', filter=Q(status='posted')),
+        failed_posts=Count('id', filter=Q(status='failed'))
     )
 
     total_accounts = FacebookAccount.objects.count()

@@ -11,8 +11,6 @@ import {
   Trash2,
   Plus,
   Edit,
-  Calendar,
-  DollarSign,
   Image as ImageIcon,
 } from "lucide-react";
 import Image from "next/image";
@@ -20,29 +18,20 @@ import CreatePostModal from "@/components/CreatePostModal";
 import EditPostModal from "@/components/EditPostModal";
 import BulkUploadPostsModal from "@/components/BulkUploadPostsModal";
 import { useToast, ToastContainer } from "@/components/ui/Toast";
-
-interface MarketplacePost {
-  id: number;
-  title: string;
-  description: string;
-  price: string;
-  image: string;
-  scheduled_time: string;
-  posted: boolean;
-  account: number;
-  account_email: string;
-}
+import StatusBadge from "@/components/StatusBadge";
+import PostingProgress from "@/components/PostingProgress";
+import type { MarketplacePost } from "@/types";
 
 export default function PostsPage() {
   const [posts, setPosts] = useState<MarketplacePost[]>([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [isBulkUploadOpen, setIsBulkUploadOpen] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [editingPost, setEditingPost] = useState<MarketplacePost | null>(null);
   const [selectedPosts, setSelectedPosts] = useState<number[]>([]); // For pending posts
   const [selectedPostedItems, setSelectedPostedItems] = useState<number[]>([]); // For posted items
+  const [activeJobId, setActiveJobId] = useState<string | null>(null); // NEW: Track active posting job
   const [activityLogs, setActivityLogs] = useState<
     Array<{
       id: number;
@@ -110,6 +99,7 @@ export default function PostsPage() {
 
   useEffect(() => {
     fetchPosts();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Cleanup old logs every minute
@@ -164,7 +154,7 @@ export default function PostsPage() {
       const response = await postsAPI.list();
       setPosts(response.data);
     } catch (err) {
-      setError("Failed to load posts");
+      showError("Failed to load posts");
       console.error(err);
     } finally {
       setLoading(false);
@@ -213,7 +203,7 @@ export default function PostsPage() {
   };
 
   const handleSelectAll = () => {
-    const pendingPosts = posts.filter((p) => !p.posted);
+    const pendingPosts = posts.filter((p) => p.status === "pending");
     if (selectedPosts.length === pendingPosts.length) {
       // Deselect all
       setSelectedPosts([]);
@@ -259,7 +249,7 @@ export default function PostsPage() {
 
   const handleStartPosting = async () => {
     // If no posts are selected, use all pending posts
-    const pendingPosts = posts.filter((p) => !p.posted);
+    const pendingPosts = posts.filter((p) => p.status === "pending");
     const postsToPost =
       selectedPosts.length > 0 ? selectedPosts : pendingPosts.map((p) => p.id);
 
@@ -267,9 +257,6 @@ export default function PostsPage() {
       showError("No pending posts available");
       return;
     }
-
-    // Get post details for logging
-    const postsToPostDetails = posts.filter((p) => postsToPost.includes(p.id));
 
     const count = postsToPost.length;
     const message =
@@ -290,56 +277,12 @@ export default function PostsPage() {
       const response = await postsAPI.startPosting(postsToPost);
       success(response.data.message || `Started posting ${count} post(s)!`);
 
+      // NEW: Get job_id from response and show real-time progress
+      if (response.data.job_id) {
+        setActiveJobId(response.data.job_id);
+      }
+
       setSelectedPosts([]);
-
-      // Poll for status updates every 3 seconds
-      const pollInterval = setInterval(async () => {
-        try {
-          const updatedPostsResponse = await postsAPI.list();
-          const updatedPosts = updatedPostsResponse.data;
-
-          // Check each post for status change
-          postsToPostDetails.forEach((originalPost) => {
-            const updatedPost = updatedPosts.find(
-              (p: MarketplacePost) => p.id === originalPost.id
-            );
-
-            if (updatedPost && updatedPost.posted && !originalPost.posted) {
-              // Post was successfully posted
-              addActivityLog(
-                "post",
-                "Post successful",
-                `"${updatedPost.title}" posted successfully to ${updatedPost.account_email}`
-              );
-              success(`Posted: ${updatedPost.title}`);
-
-              // Update the original post to prevent duplicate logs
-              originalPost.posted = true;
-            }
-          });
-
-          // Update posts state
-          setPosts(updatedPosts);
-
-          // Check if all posts are done
-          const allPosted = postsToPostDetails.every((p) => p.posted);
-          if (allPosted) {
-            clearInterval(pollInterval);
-            addActivityLog(
-              "post",
-              "Posting completed",
-              `All ${count} post(s) have been processed`
-            );
-          }
-        } catch (error) {
-          console.error("Error polling for updates:", error);
-        }
-      }, 3000); // Poll every 3 seconds
-
-      // Stop polling after 5 minutes (max time)
-      setTimeout(() => {
-        clearInterval(pollInterval);
-      }, 300000); // 5 minutes
     } catch (err) {
       const error = err as { response?: { data?: { error?: string } } };
       const errorMsg =
@@ -367,7 +310,7 @@ export default function PostsPage() {
   };
 
   const handleSelectAllPosted = () => {
-    const postedPosts = posts.filter((p) => p.posted);
+    const postedPosts = posts.filter((p) => p.status === "posted");
     if (selectedPostedItems.length === postedPosts.length) {
       // Deselect all
       setSelectedPostedItems([]);
@@ -379,7 +322,7 @@ export default function PostsPage() {
 
   const handleDeleteSelectedPosted = async () => {
     // If no items are selected, use all posted items
-    const postedPosts = posts.filter((p) => p.posted);
+    const postedPosts = posts.filter((p) => p.status === "posted");
     const itemsToDelete =
       selectedPostedItems.length > 0
         ? selectedPostedItems
@@ -419,8 +362,9 @@ export default function PostsPage() {
 
   const stats = {
     total: posts.length,
-    posted: posts.filter((p) => p.posted).length,
-    pending: posts.filter((p) => !p.posted).length,
+    posted: posts.filter((p) => p.status === "posted").length,
+    pending: posts.filter((p) => p.status === "pending").length,
+    failed: posts.filter((p) => p.status === "failed").length,
   };
 
   if (loading) {
@@ -438,6 +382,22 @@ export default function PostsPage() {
     <div className="space-y-6">
       {/* Toast Notifications */}
       <ToastContainer toasts={toasts} removeToast={removeToast} />
+
+      {/* Real-Time Posting Progress - NEW */}
+      {activeJobId && (
+        <PostingProgress
+          jobId={activeJobId}
+          onComplete={() => {
+            setActiveJobId(null);
+            fetchPosts(); // Refresh posts when job completes
+            addActivityLog(
+              "post",
+              "Posting completed",
+              "All posts have been processed"
+            );
+          }}
+        />
+      )}
 
       {/* Create Post Modal */}
       <CreatePostModal
@@ -592,14 +552,14 @@ export default function PostsPage() {
           </CardHeader>
           <CardContent className="flex-1 flex flex-col overflow-hidden">
             <div className="space-y-3 flex-1 overflow-y-auto">
-              {posts.filter((p) => !p.posted).length === 0 ? (
+              {posts.filter((p) => p.status === "pending").length === 0 ? (
                 <div className="text-center py-8 text-gray-500">
                   <XCircle className="h-12 w-12 mx-auto mb-2 text-gray-300" />
                   <p>No pending posts</p>
                 </div>
               ) : (
                 posts
-                  .filter((p) => !p.posted)
+                  .filter((p) => p.status === "pending")
                   .map((post) => (
                     <div
                       key={post.id}
@@ -634,9 +594,15 @@ export default function PostsPage() {
                           )}
                         </div>
                         <div className="flex-1 min-w-0">
-                          <h4 className="font-semibold text-sm text-gray-900 truncate">
-                            {post.title}
-                          </h4>
+                          <div className="flex items-center justify-between mb-1">
+                            <h4 className="font-semibold text-sm text-gray-900 truncate">
+                              {post.title}
+                            </h4>
+                            <StatusBadge
+                              status={post.status}
+                              errorMessage={post.error_message}
+                            />
+                          </div>
                           <p className="text-xs text-gray-600 line-clamp-1">
                             {post.description}
                           </p>
@@ -653,8 +619,13 @@ export default function PostsPage() {
                           </div>
                           <div className="text-xs text-gray-700 mt-1 truncate">
                             <span className="font-medium">Account:</span>{" "}
-                            {post.account_email}
+                            {post.account.email}
                           </div>
+                          {post.retry_count > 0 && (
+                            <div className="text-xs text-orange-600 mt-1">
+                              Retries: {post.retry_count}
+                            </div>
+                          )}
                           <div className="flex gap-1 mt-2">
                             <Button
                               variant="outline"
@@ -689,9 +660,12 @@ export default function PostsPage() {
                 size="sm"
                 onClick={handleSelectAll}
                 className="flex-1"
-                disabled={posts.filter((p) => !p.posted).length === 0}
+                disabled={
+                  posts.filter((p) => p.status === "pending").length === 0
+                }
               >
-                {selectedPosts.length === posts.filter((p) => !p.posted).length
+                {selectedPosts.length ===
+                posts.filter((p) => p.status === "pending").length
                   ? "Deselect All"
                   : "Select All"}
               </Button>
@@ -709,7 +683,9 @@ export default function PostsPage() {
                 onClick={handleStartPosting}
                 className="bg-green-600 hover:bg-green-700 text-white flex-1"
                 size="sm"
-                disabled={posts.filter((p) => !p.posted).length === 0}
+                disabled={
+                  posts.filter((p) => p.status === "pending").length === 0
+                }
               >
                 <CheckCircle className="h-4 w-4 mr-2" />
                 Start Posting
@@ -731,14 +707,14 @@ export default function PostsPage() {
           </CardHeader>
           <CardContent className="flex-1 flex flex-col overflow-hidden">
             <div className="space-y-3 flex-1 overflow-y-auto">
-              {posts.filter((p) => p.posted).length === 0 ? (
+              {posts.filter((p) => p.status === "posted").length === 0 ? (
                 <div className="text-center py-8 text-gray-500">
                   <CheckCircle className="h-12 w-12 mx-auto mb-2 text-gray-300" />
                   <p>No posted items yet</p>
                 </div>
               ) : (
                 posts
-                  .filter((p) => p.posted)
+                  .filter((p) => p.status === "posted")
                   .map((post) => (
                     <div
                       key={post.id}
@@ -773,9 +749,15 @@ export default function PostsPage() {
                           )}
                         </div>
                         <div className="flex-1 min-w-0">
-                          <h4 className="font-semibold text-sm text-gray-900 truncate">
-                            {post.title}
-                          </h4>
+                          <div className="flex items-center justify-between mb-1">
+                            <h4 className="font-semibold text-sm text-gray-900 truncate">
+                              {post.title}
+                            </h4>
+                            <StatusBadge
+                              status={post.status}
+                              errorMessage={post.error_message}
+                            />
+                          </div>
                           <p className="text-xs text-gray-600 line-clamp-1">
                             {post.description}
                           </p>
@@ -792,7 +774,7 @@ export default function PostsPage() {
                           </div>
                           <div className="text-xs text-gray-700 mt-1 truncate">
                             <span className="font-medium">Account:</span>{" "}
-                            {post.account_email}
+                            {post.account.email}
                           </div>
                           <div className="flex gap-1 mt-2">
                             <Button
@@ -828,10 +810,12 @@ export default function PostsPage() {
                 size="sm"
                 onClick={handleSelectAllPosted}
                 className="flex-1"
-                disabled={posts.filter((p) => p.posted).length === 0}
+                disabled={
+                  posts.filter((p) => p.status === "posted").length === 0
+                }
               >
                 {selectedPostedItems.length ===
-                posts.filter((p) => p.posted).length
+                posts.filter((p) => p.status === "posted").length
                   ? "Deselect All"
                   : "Select All"}
               </Button>
@@ -840,7 +824,9 @@ export default function PostsPage() {
                 size="sm"
                 onClick={handleDeleteSelectedPosted}
                 className="flex-1"
-                disabled={posts.filter((p) => p.posted).length === 0}
+                disabled={
+                  posts.filter((p) => p.status === "posted").length === 0
+                }
               >
                 <Trash2 className="h-4 w-4 mr-2" />
                 Delete

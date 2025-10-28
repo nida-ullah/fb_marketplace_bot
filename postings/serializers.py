@@ -1,11 +1,19 @@
 from rest_framework import serializers
 from .models import MarketplacePost, PostingJob, ErrorLog
 from accounts.models import FacebookAccount
+from accounts.serializers import FacebookAccountSerializer
 
 
 class MarketplacePostSerializer(serializers.ModelSerializer):
-    account_email = serializers.EmailField(
-        source='account.email', read_only=True)
+    # Nested account object for read operations
+    account = FacebookAccountSerializer(read_only=True)
+    # Account ID for write operations
+    account_id = serializers.PrimaryKeyRelatedField(
+        source='account',
+        queryset=FacebookAccount.objects.all(),
+        write_only=True,
+        required=False
+    )
 
     # Make all fields optional for updates (partial updates)
     title = serializers.CharField(required=False, max_length=255)
@@ -14,22 +22,18 @@ class MarketplacePostSerializer(serializers.ModelSerializer):
         required=False, max_digits=10, decimal_places=2)
     image = serializers.ImageField(required=False)
     scheduled_time = serializers.DateTimeField(required=False)
-    posted = serializers.BooleanField(required=False)
     status = serializers.CharField(required=False)
-    account = serializers.PrimaryKeyRelatedField(
-        required=False,
-        queryset=FacebookAccount.objects.all()
-    )
 
     class Meta:
         model = MarketplacePost
         fields = [
             'id', 'title', 'description', 'price', 'image',
             'scheduled_time', 'posted', 'status', 'error_message',
-            'retry_count', 'account', 'account_email',
+            'retry_count', 'account', 'account_id',
             'created_at', 'updated_at'
         ]
-        read_only_fields = ['created_at', 'updated_at', 'retry_count']
+        read_only_fields = ['created_at',
+                            'updated_at', 'retry_count', 'posted']
 
     def validate_price(self, value):
         """Validate that price is positive"""

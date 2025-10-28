@@ -22,7 +22,12 @@ export interface MarketplacePost {
   image?: string;
   scheduled_time: string;
   posted: boolean;
+  // NEW: Enhanced status tracking
+  status: "pending" | "posting" | "posted" | "failed";
+  error_message?: string;
+  retry_count: number;
   created_at?: string;
+  updated_at?: string;
 }
 
 export interface DashboardStats {
@@ -32,6 +37,64 @@ export interface DashboardStats {
   pending_posts: number;
   posted_today: number;
   success_rate: number;
+}
+
+// NEW: Posting job tracking for real-time progress
+export interface PostingJob {
+  id: number;
+  job_id: string;
+  status: "queued" | "running" | "completed" | "failed";
+  total_posts: number;
+  completed_posts: number;
+  failed_posts: number;
+  current_post_id?: number;
+  current_post_title?: string;
+  error_message?: string;
+  started_at: string;
+  completed_at?: string;
+  progress_percentage: number;
+}
+
+// NEW: Error logging
+export interface ErrorLog {
+  id: number;
+  post: number;
+  post_title: string;
+  error_type:
+    | "session_expired"
+    | "network_error"
+    | "captcha"
+    | "rate_limit"
+    | "validation_error"
+    | "unknown";
+  error_message: string;
+  stack_trace?: string;
+  screenshot?: string;
+  created_at: string;
+}
+
+// NEW: Account health monitoring
+export interface AccountHealth {
+  account_id: number;
+  email: string;
+  session_exists: boolean;
+  session_valid: boolean;
+  session_age_days?: number;
+  total_posts: number;
+  posted_count: number;
+  failed_count: number;
+  health_status: "healthy" | "warning" | "error";
+}
+
+export interface HealthCheckResponse {
+  overall_health: "healthy" | "warning" | "error";
+  summary: {
+    total_accounts: number;
+    healthy: number;
+    warning: number;
+    error: number;
+  };
+  accounts: AccountHealth[];
 }
 
 export interface LoginCredentials {
