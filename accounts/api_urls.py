@@ -1,5 +1,6 @@
 from django.urls import path
 from . import api_views
+from postings import realtime_views
 
 app_name = 'accounts_api'
 
@@ -23,4 +24,10 @@ urlpatterns = [
          name='update_account_session'),
     path('accounts/<int:pk>/',
          api_views.FacebookAccountDetailView.as_view(), name='account_detail'),
+
+    # Health checks
+    path('accounts/health-check/',
+         realtime_views.health_check_accounts, name='health_check_accounts'),
+    path('accounts/<int:account_id>/validate-session/',
+         realtime_views.validate_account_session, name='validate_session'),
 ]

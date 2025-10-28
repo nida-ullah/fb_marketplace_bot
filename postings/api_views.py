@@ -341,6 +341,7 @@ class StartPostingView(APIView):
         """Trigger posting process for selected post IDs"""
         import subprocess
         import sys
+        import uuid
 
         post_ids = request.data.get('post_ids', [])
 
@@ -366,6 +367,9 @@ class StartPostingView(APIView):
 
             pending_count = pending_posts.count()
 
+            # Generate unique job ID for tracking
+            job_id = str(uuid.uuid4())
+
             # Start the posting script in background
             # This runs the Django management command asynchronously
             python_executable = sys.executable
@@ -377,7 +381,17 @@ class StartPostingView(APIView):
             manage_py_path = os.path.join(project_root, 'manage.py')
 
             # Build command to run the management command
-            # Passing post IDs as comma-separated string
+            # Passing post IDs as comma-separated string and job ID
+            post_ids_str = ','.join(map(str, post_ids))
+            command = [
+                python_executable,
+                manage_py_path,
+                'post_to_marketplace',
+                '--post-ids',
+                post_ids_str,
+                '--job-id',
+                job_id
+            ]
             post_ids_str = ','.join(map(str, post_ids))
             command = [
                 python_executable,
@@ -434,9 +448,11 @@ class StartPostingView(APIView):
             return Response({
                 'success': True,
                 'message': f'Started posting process for {pending_count} pending post(s)',
+                'job_id': job_id,
                 'pending_count': pending_count,
                 'total_selected': len(post_ids),
-                'log_file': log_file
+                'log_file': log_file,
+                'status_stream_url': f'/api/posts/status-stream/{job_id}/'
             }, status=status.HTTP_200_OK)
 
         except Exception as e:
