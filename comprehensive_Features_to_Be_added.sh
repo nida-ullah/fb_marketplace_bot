@@ -62,7 +62,7 @@ Multi-Image Support - Upload multiple images per post (carousel)
 1. Performance Optimization
 Database Indexing - Add indexes on frequently queried fields (posted, scheduled_time, account_id)
 Query Optimization - Use select_related() and prefetch_related() to reduce queries
-Pagination - Add pagination to posts endpoint (limit 50 per page)
+# Pagination - Add pagination to posts endpoint (limit 50 per page)
 Caching - Cache frequently accessed data (accounts, stats) using Redis
 Background Tasks - Use Celery for long-running tasks instead of subprocess
 Async Views - Use Django async views for I/O-bound operations

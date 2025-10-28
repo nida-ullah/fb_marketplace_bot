@@ -5,6 +5,7 @@ from rest_framework import status
 from rest_framework.views import APIView
 from .models import MarketplacePost
 from .serializers import MarketplacePostSerializer
+from .cache_utils import invalidate_dashboard_cache, invalidate_posts_cache
 from accounts.models import FacebookAccount
 import requests
 from django.core.files.base import ContentFile
@@ -22,8 +23,10 @@ class MarketplacePostListCreateView(generics.ListCreateAPIView):
     permission_classes = [IsAuthenticated]
 
     def get_queryset(self):
-        """Optionally filter by status"""
-        queryset = MarketplacePost.objects.all().order_by('-created_at')
+        """Optionally filter by status - optimized with select_related"""
+        # Use select_related to fetch account data in a single query (reduces N+1 queries)
+        queryset = MarketplacePost.objects.select_related(
+            'account').order_by('-created_at')
         status = self.request.query_params.get('status', None)
         if status:
             queryset = queryset.filter(status=status)
@@ -31,6 +34,10 @@ class MarketplacePostListCreateView(generics.ListCreateAPIView):
 
     def create(self, request, *args, **kwargs):
         """Handle post creation with optional image URL"""
+        # Invalidate caches when creating a post
+        invalidate_dashboard_cache()
+        invalidate_posts_cache()
+
         # Check if image_url is provided
         image_url = request.data.get('image_url')
 
@@ -82,12 +89,23 @@ class MarketplacePostListCreateView(generics.ListCreateAPIView):
 
 class MarketplacePostDetailView(generics.RetrieveUpdateDestroyAPIView):
     """Retrieve, update or delete a marketplace post"""
-    queryset = MarketplacePost.objects.all()
+    # Optimized queryset with select_related to reduce queries
+    queryset = MarketplacePost.objects.select_related('account')
     serializer_class = MarketplacePostSerializer
     permission_classes = [IsAuthenticated]
 
+    def destroy(self, request, *args, **kwargs):
+        """Override delete to invalidate caches"""
+        invalidate_dashboard_cache()
+        invalidate_posts_cache()
+        return super().destroy(request, *args, **kwargs)
+
     def update(self, request, *args, **kwargs):
         """Handle post update with better error handling - supports partial updates"""
+        # Invalidate caches when updating a post
+        invalidate_dashboard_cache()
+        invalidate_posts_cache()
+
         # Force partial update (PATCH behavior even for PUT)
         kwargs['partial'] = True
         instance = self.get_object()
@@ -139,6 +157,10 @@ class BulkUploadPostsView(APIView):
 
     def post(self, request):
         """Process CSV file and create posts for selected accounts"""
+        # Invalidate caches at the start since we'll be creating multiple posts
+        invalidate_dashboard_cache()
+        invalidate_posts_cache()
+
         csv_file = request.FILES.get('csv_file')
         account_ids = request.data.getlist(
             'accounts[]') or request.data.getlist('accounts')
@@ -329,9 +351,9 @@ class StartPostingView(APIView):
                 status=status.HTTP_400_BAD_REQUEST
             )
 
-        # Filter only pending posts
+        # Filter only pending posts - optimized with select_related
         try:
-            pending_posts = MarketplacePost.objects.filter(
+            pending_posts = MarketplacePost.objects.select_related('account').filter(
                 id__in=post_ids,
                 posted=False
             )

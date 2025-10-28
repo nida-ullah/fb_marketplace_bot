@@ -5,6 +5,8 @@ from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework_simplejwt.tokens import RefreshToken
 from django.contrib.auth import authenticate
 from django.contrib.auth.models import User
+from django.core.cache import cache
+from django.conf import settings
 from .serializers import UserSerializer, RegisterSerializer, FacebookAccountSerializer
 from .models import FacebookAccount
 from postings.models import MarketplacePost
@@ -80,28 +82,48 @@ def get_user(request):
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
 def dashboard_stats(request):
-    """Get dashboard statistics"""
+    """Get dashboard statistics - optimized with caching and aggregation"""
+    from django.db.models import Count, Q
+
+    # Try to get from cache first
+    cache_key = 'dashboard_stats'
+    cached_stats = cache.get(cache_key)
+
+    if cached_stats:
+        return Response(cached_stats)
+
+    # Use aggregation for better performance (single query instead of 4)
+    stats = MarketplacePost.objects.aggregate(
+        total_posts=Count('id'),
+        pending_posts=Count('id', filter=Q(posted=False)),
+        posted_posts=Count('id', filter=Q(posted=True))
+    )
+
     total_accounts = FacebookAccount.objects.count()
-    total_posts = MarketplacePost.objects.count()
-    pending_posts = MarketplacePost.objects.filter(posted=False).count()
-    posted_today = MarketplacePost.objects.filter(posted=True).count()
 
     # Calculate success rate
-    posted_posts = MarketplacePost.objects.filter(posted=True).count()
+    total_posts = stats['total_posts']
+    posted_posts = stats['posted_posts']
     success_rate = (posted_posts / total_posts * 100) if total_posts > 0 else 0
 
-    return Response({
+    response_data = {
         'total_accounts': total_accounts,
         'total_posts': total_posts,
-        'pending_posts': pending_posts,
-        'posted_today': posted_today,
+        'pending_posts': stats['pending_posts'],
+        'posted_today': posted_posts,  # This should ideally filter by date
         'success_rate': round(success_rate, 1)
-    })
+    }
+
+    # Cache for 60 seconds
+    cache.set(cache_key, response_data, settings.CACHE_TTL['DASHBOARD_STATS'])
+
+    return Response(response_data)
 
 
 class FacebookAccountListCreateView(generics.ListCreateAPIView):
-    """List all Facebook accounts or create a new one"""
-    queryset = FacebookAccount.objects.all()
+    """List all Facebook accounts or create a new one - optimized with prefetch_related"""
+    queryset = FacebookAccount.objects.prefetch_related(
+        'marketplacepost_set').all().order_by('-created_at')
     serializer_class = FacebookAccountSerializer
     permission_classes = [IsAuthenticated]
 

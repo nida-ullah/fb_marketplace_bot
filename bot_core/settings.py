@@ -142,6 +142,25 @@ MEDIA_ROOT = BASE_DIR / 'media'
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
+# Cache Configuration (using Django's built-in cache)
+# For production, replace with Redis cache backend
+CACHES = {
+    'default': {
+        'BACKEND': 'django.core.cache.backends.locmem.LocMemCache',
+        'LOCATION': 'fb-marketplace-cache',
+        'OPTIONS': {
+            'MAX_ENTRIES': 1000
+        }
+    }
+}
+
+# Cache timeouts (in seconds)
+CACHE_TTL = {
+    'DASHBOARD_STATS': 60,  # 1 minute
+    'ACCOUNTS_LIST': 300,   # 5 minutes
+    'POSTS_LIST': 30,       # 30 seconds
+}
+
 # REST Framework Configuration
 REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': [
