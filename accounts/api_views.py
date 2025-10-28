@@ -4,11 +4,10 @@ from rest_framework.response import Response
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework_simplejwt.tokens import RefreshToken
 from django.contrib.auth import authenticate
-from django.contrib.auth.models import User
-from django.core.cache import cache
 from django.conf import settings
+from django.core.cache import cache
 from .serializers import UserSerializer, RegisterSerializer, FacebookAccountSerializer
-from .models import FacebookAccount
+from .models import CustomUser, FacebookAccount
 from postings.models import MarketplacePost
 from automation.post_to_facebook import save_session
 from threading import Thread
@@ -18,17 +17,20 @@ import os
 @api_view(['POST'])
 @permission_classes([AllowAny])
 def register(request):
-    """Register a new user"""
+    """Register a new user - requires admin approval before login"""
     serializer = RegisterSerializer(data=request.data)
     if serializer.is_valid():
         user = serializer.save()
-        refresh = RefreshToken.for_user(user)
+        # User is created but NOT approved (is_approved=False by default)
 
+        # Don't return tokens - user needs approval first
         return Response({
-            'user': UserSerializer(user).data,
-            'tokens': {
-                'refresh': str(refresh),
-                'access': str(refresh.access_token),
+            'success': True,
+            'message': 'Account created successfully! Your account is pending approval. You will be able to login once an administrator approves your account.',
+            'user': {
+                'username': user.username,
+                'email': user.email,
+                'is_approved': user.is_approved
             }
         }, status=status.HTTP_201_CREATED)
 
@@ -38,7 +40,7 @@ def register(request):
 @api_view(['POST'])
 @permission_classes([AllowAny])
 def login(request):
-    """Login user and return JWT tokens"""
+    """Login user and return JWT tokens - only for approved users"""
     username = request.data.get('username')
     email = request.data.get('email')
     password = request.data.get('password')
@@ -46,9 +48,9 @@ def login(request):
     # Allow login with email or username
     if email and not username:
         try:
-            user = User.objects.get(email=email)
+            user = CustomUser.objects.get(email=email)
             username = user.username
-        except User.DoesNotExist:
+        except CustomUser.DoesNotExist:
             return Response(
                 {'error': 'Invalid credentials'},
                 status=status.HTTP_401_UNAUTHORIZED
@@ -57,6 +59,15 @@ def login(request):
     user = authenticate(username=username, password=password)
 
     if user is not None:
+        # Check if user is approved
+        if not user.is_approved:
+            return Response({
+                'error': 'Account pending approval',
+                'message': 'Your account is waiting for administrator approval. Please contact the administrator.',
+                'is_approved': False
+            }, status=status.HTTP_403_FORBIDDEN)
+
+        # User is approved, generate tokens
         refresh = RefreshToken.for_user(user)
         return Response({
             'user': UserSerializer(user).data,

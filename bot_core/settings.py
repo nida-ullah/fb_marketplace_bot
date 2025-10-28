@@ -142,6 +142,9 @@ MEDIA_ROOT = BASE_DIR / 'media'
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
+# Custom User Model
+AUTH_USER_MODEL = 'accounts.CustomUser'
+
 # Cache Configuration (using Django's built-in cache)
 # For production, replace with Redis cache backend
 CACHES = {

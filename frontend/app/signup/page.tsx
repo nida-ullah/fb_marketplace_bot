@@ -33,6 +33,7 @@ type SignupFormData = z.infer<typeof signupSchema>;
 export default function SignupPage() {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState("");
+  const [success, setSuccess] = useState("");
   const { signup } = useAuth();
 
   const {
@@ -46,10 +47,16 @@ export default function SignupPage() {
   const onSubmit = async (data: SignupFormData) => {
     setIsLoading(true);
     setError("");
+    setSuccess("");
 
     try {
-      await signup(data.name, data.email, data.password);
-      // Redirect handled by AuthContext
+      const result = await signup(data.name, data.email, data.password);
+
+      // Check if approval is required
+      if (result && result.message) {
+        setSuccess(result.message);
+      }
+      // If no result, user was redirected to dashboard (old flow)
     } catch (err) {
       setError(
         err instanceof Error ? err.message : "Signup failed. Please try again."
@@ -78,11 +85,48 @@ export default function SignupPage() {
               </div>
             )}
 
+            {success && (
+              <div className="rounded-lg bg-green-50 border border-green-200 p-4">
+                <div className="flex items-start">
+                  <div className="flex-shrink-0">
+                    <svg
+                      className="h-5 w-5 text-green-400"
+                      viewBox="0 0 20 20"
+                      fill="currentColor"
+                    >
+                      <path
+                        fillRule="evenodd"
+                        d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z"
+                        clipRule="evenodd"
+                      />
+                    </svg>
+                  </div>
+                  <div className="ml-3">
+                    <h3 className="text-sm font-medium text-green-800">
+                      Account Created Successfully!
+                    </h3>
+                    <div className="mt-2 text-sm text-green-700">
+                      <p>{success}</p>
+                      <p className="mt-2">
+                        <Link
+                          href="/login"
+                          className="font-medium underline hover:text-green-600"
+                        >
+                          Return to login page
+                        </Link>
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
             <Input
               label="Full Name"
               type="text"
               placeholder="John Doe"
               error={errors.name?.message}
+              disabled={!!success}
               {...register("name")}
             />
 
@@ -91,6 +135,7 @@ export default function SignupPage() {
               type="email"
               placeholder="name@example.com"
               error={errors.email?.message}
+              disabled={!!success}
               {...register("email")}
             />
 
@@ -99,6 +144,7 @@ export default function SignupPage() {
               type="password"
               placeholder="Create a password"
               error={errors.password?.message}
+              disabled={!!success}
               {...register("password")}
             />
 
@@ -107,10 +153,15 @@ export default function SignupPage() {
               type="password"
               placeholder="Confirm your password"
               error={errors.confirmPassword?.message}
+              disabled={!!success}
               {...register("confirmPassword")}
             />
 
-            <Button type="submit" className="w-full" disabled={isLoading}>
+            <Button
+              type="submit"
+              className="w-full"
+              disabled={isLoading || !!success}
+            >
               {isLoading ? "Creating account..." : "Create account"}
             </Button>
 

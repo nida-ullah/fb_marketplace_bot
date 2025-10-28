@@ -1,12 +1,13 @@
 from rest_framework import serializers
-from django.contrib.auth.models import User
-from .models import FacebookAccount
+from .models import CustomUser, FacebookAccount
 
 
 class UserSerializer(serializers.ModelSerializer):
     class Meta:
-        model = User
-        fields = ['id', 'username', 'email', 'first_name', 'last_name']
+        model = CustomUser
+        fields = ['id', 'username', 'email',
+                  'first_name', 'last_name', 'is_approved']
+        read_only_fields = ['is_approved']
 
 
 class RegisterSerializer(serializers.ModelSerializer):
@@ -14,7 +15,7 @@ class RegisterSerializer(serializers.ModelSerializer):
     confirm_password = serializers.CharField(write_only=True)
 
     class Meta:
-        model = User
+        model = CustomUser
         fields = ['username', 'email', 'password',
                   'confirm_password', 'first_name', 'last_name']
 
@@ -26,12 +27,13 @@ class RegisterSerializer(serializers.ModelSerializer):
 
     def create(self, validated_data):
         validated_data.pop('confirm_password')
-        user = User.objects.create_user(
+        user = CustomUser.objects.create_user(
             username=validated_data['username'],
             email=validated_data.get('email', ''),
             password=validated_data['password'],
             first_name=validated_data.get('first_name', ''),
-            last_name=validated_data.get('last_name', '')
+            last_name=validated_data.get('last_name', ''),
+            is_approved=False  # New users need approval
         )
         return user
 

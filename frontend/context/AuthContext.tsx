@@ -64,6 +64,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setUser(user);
       router.push("/dashboard");
     } catch (error: any) {
+      // Check if it's an approval error
+      if (error.response?.status === 403) {
+        throw new Error(
+          error.response?.data?.message ||
+            "Your account is pending approval. Please contact the administrator."
+        );
+      }
       throw new Error(error.response?.data?.error || "Login failed");
     }
   };
@@ -85,14 +92,23 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         firstName,
         lastName
       );
-      const { tokens, user } = response.data;
 
-      // Save access token to localStorage
-      localStorage.setItem("token", tokens.access);
-      localStorage.setItem("user", JSON.stringify(user));
+      // Check if response indicates approval is needed
+      if (response.data.success && !response.data.tokens) {
+        // Account created but needs approval
+        return response.data; // Return message to display
+      }
 
-      setUser(user);
-      router.push("/dashboard");
+      // Old flow (if admin changes approval system)
+      if (response.data.tokens) {
+        const { tokens, user } = response.data;
+        localStorage.setItem("token", tokens.access);
+        localStorage.setItem("user", JSON.stringify(user));
+        setUser(user);
+        router.push("/dashboard");
+      }
+
+      return response.data;
     } catch (error: any) {
       const errorMessage =
         error.response?.data?.username?.[0] ||
