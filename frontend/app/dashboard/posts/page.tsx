@@ -20,6 +20,7 @@ import BulkUploadPostsModal from "@/components/BulkUploadPostsModal";
 import { useToast, ToastContainer } from "@/components/ui/Toast";
 import StatusBadge from "@/components/StatusBadge";
 import PostingProgress from "@/components/PostingProgress";
+import ConfirmDialog from "@/components/ui/ConfirmDialog";
 import type { MarketplacePost } from "@/types";
 
 export default function PostsPage() {
@@ -32,6 +33,23 @@ export default function PostsPage() {
   const [selectedPosts, setSelectedPosts] = useState<number[]>([]); // For pending posts
   const [selectedPostedItems, setSelectedPostedItems] = useState<number[]>([]); // For posted items
   const [activeJobId, setActiveJobId] = useState<string | null>(null); // NEW: Track active posting job
+
+  // Confirmation dialog state
+  const [confirmDialog, setConfirmDialog] = useState<{
+    isOpen: boolean;
+    title: string;
+    message: string;
+    type: "danger" | "warning" | "success" | "info";
+    onConfirm: () => void;
+    confirmText?: string;
+  }>({
+    isOpen: false,
+    title: "",
+    message: "",
+    type: "warning",
+    onConfirm: () => {},
+  });
+
   const [activityLogs, setActivityLogs] = useState<
     Array<{
       id: number;
@@ -162,31 +180,40 @@ export default function PostsPage() {
   };
 
   const handleDelete = async (id: number) => {
-    if (!confirm("Are you sure you want to delete this post?")) return;
-
     const postToDelete = posts.find((p) => p.id === id);
 
-    try {
-      await postsAPI.delete(id);
-      setPosts(posts.filter((post) => post.id !== id));
-      setSelectedPosts(selectedPosts.filter((postId) => postId !== id));
-      setSelectedPostedItems(
-        selectedPostedItems.filter((postId) => postId !== id)
-      );
-      success("Post deleted successfully");
+    setConfirmDialog({
+      isOpen: true,
+      title: "Delete Post",
+      message: `Are you sure you want to delete "${
+        postToDelete?.title || "this post"
+      }"? This action cannot be undone.`,
+      type: "danger",
+      confirmText: "Delete",
+      onConfirm: async () => {
+        try {
+          await postsAPI.delete(id);
+          setPosts(posts.filter((post) => post.id !== id));
+          setSelectedPosts(selectedPosts.filter((postId) => postId !== id));
+          setSelectedPostedItems(
+            selectedPostedItems.filter((postId) => postId !== id)
+          );
+          success("Post deleted successfully");
 
-      // Log the deletion
-      if (postToDelete) {
-        addActivityLog(
-          "delete",
-          "Post deleted",
-          `"${postToDelete.title}" removed from listings`
-        );
-      }
-    } catch (err) {
-      showError("Failed to delete post");
-      console.error(err);
-    }
+          // Log the deletion
+          if (postToDelete) {
+            addActivityLog(
+              "delete",
+              "Post deleted",
+              `"${postToDelete.title}" removed from listings`
+            );
+          }
+        } catch (err) {
+          showError("Failed to delete post");
+          console.error(err);
+        }
+      },
+    });
   };
 
   const handleEdit = (post: MarketplacePost) => {
@@ -219,32 +246,33 @@ export default function PostsPage() {
       return;
     }
 
-    if (
-      !confirm(
-        `Are you sure you want to delete ${selectedPosts.length} selected post(s)?`
-      )
-    )
-      return;
-
     const count = selectedPosts.length;
 
-    try {
-      await Promise.all(selectedPosts.map((id) => postsAPI.delete(id)));
-      setPosts(posts.filter((post) => !selectedPosts.includes(post.id)));
-      success(`Successfully deleted ${count} post(s)`);
+    setConfirmDialog({
+      isOpen: true,
+      title: "Delete Selected Posts",
+      message: `Are you sure you want to delete ${count} selected post(s)? This action cannot be undone.`,
+      type: "danger",
+      confirmText: "Delete All",
+      onConfirm: async () => {
+        try {
+          await Promise.all(selectedPosts.map((id) => postsAPI.delete(id)));
+          setPosts(posts.filter((post) => !selectedPosts.includes(post.id)));
+          success(`Successfully deleted ${count} post(s)`);
 
-      // Log bulk deletion
-      addActivityLog(
-        "delete",
-        "Bulk deletion",
-        `${count} pending post(s) deleted`
-      );
-
-      setSelectedPosts([]);
-    } catch (err) {
-      showError("Failed to delete some posts");
-      console.error(err);
-    }
+          // Log bulk deletion
+          addActivityLog(
+            "delete",
+            "Bulk deletion",
+            `${count} pending posts removed from queue`
+          );
+          setSelectedPosts([]);
+        } catch (err) {
+          showError("Failed to delete selected posts");
+          console.error(err);
+        }
+      },
+    });
   };
 
   const handleStartPosting = async () => {
@@ -264,40 +292,47 @@ export default function PostsPage() {
         ? `Start posting ${count} selected post(s) to Facebook Marketplace?`
         : `Start posting all ${count} pending post(s) to Facebook Marketplace?`;
 
-    if (!confirm(message)) return;
+    setConfirmDialog({
+      isOpen: true,
+      title: "Start Posting",
+      message: message,
+      type: "info",
+      confirmText: "Start Posting",
+      onConfirm: async () => {
+        try {
+          // Log the start of posting
+          addActivityLog(
+            "post",
+            "Posting initiated",
+            `Starting to post ${count} item(s) to Facebook Marketplace...`
+          );
 
-    try {
-      // Log the start of posting
-      addActivityLog(
-        "post",
-        "Posting initiated",
-        `Starting to post ${count} item(s) to Facebook Marketplace...`
-      );
+          const response = await postsAPI.startPosting(postsToPost);
+          success(response.data.message || `Started posting ${count} post(s)!`);
 
-      const response = await postsAPI.startPosting(postsToPost);
-      success(response.data.message || `Started posting ${count} post(s)!`);
+          // NEW: Get job_id from response and show real-time progress
+          if (response.data.job_id) {
+            setActiveJobId(response.data.job_id);
+          }
 
-      // NEW: Get job_id from response and show real-time progress
-      if (response.data.job_id) {
-        setActiveJobId(response.data.job_id);
-      }
+          setSelectedPosts([]);
+        } catch (err) {
+          const error = err as { response?: { data?: { error?: string } } };
+          const errorMsg =
+            error.response?.data?.error || "Failed to start posting process";
+          showError(errorMsg);
 
-      setSelectedPosts([]);
-    } catch (err) {
-      const error = err as { response?: { data?: { error?: string } } };
-      const errorMsg =
-        error.response?.data?.error || "Failed to start posting process";
-      showError(errorMsg);
+          // Log the failure
+          addActivityLog(
+            "post",
+            "Posting failed",
+            `Failed to start posting: ${errorMsg}`
+          );
 
-      // Log the failure
-      addActivityLog(
-        "post",
-        "Posting failed",
-        `Failed to start posting: ${errorMsg}`
-      );
-
-      console.error(err);
-    }
+          console.error(err);
+        }
+      },
+    });
   };
 
   // Functions for Posted Items
@@ -339,25 +374,32 @@ export default function PostsPage() {
         ? `Are you sure you want to delete ${count} selected posted item(s)?`
         : `Are you sure you want to delete all ${count} posted item(s)?`;
 
-    if (!confirm(message)) return;
+    setConfirmDialog({
+      isOpen: true,
+      title: "Delete Posted Items",
+      message: message + " This action cannot be undone.",
+      type: "danger",
+      confirmText: "Delete",
+      onConfirm: async () => {
+        try {
+          await Promise.all(itemsToDelete.map((id) => postsAPI.delete(id)));
+          setPosts(posts.filter((post) => !itemsToDelete.includes(post.id)));
+          success(`Successfully deleted ${count} posted item(s)`);
 
-    try {
-      await Promise.all(itemsToDelete.map((id) => postsAPI.delete(id)));
-      setPosts(posts.filter((post) => !itemsToDelete.includes(post.id)));
-      success(`Successfully deleted ${count} posted item(s)`);
+          // Log deletion of posted items
+          addActivityLog(
+            "delete",
+            "Posted items deleted",
+            `${count} posted item(s) removed from listings`
+          );
 
-      // Log deletion of posted items
-      addActivityLog(
-        "delete",
-        "Posted items deleted",
-        `${count} posted item(s) removed from listings`
-      );
-
-      setSelectedPostedItems([]);
-    } catch (err) {
-      showError("Failed to delete some posted items");
-      console.error(err);
-    }
+          setSelectedPostedItems([]);
+        } catch (err) {
+          showError("Failed to delete some posted items");
+          console.error(err);
+        }
+      },
+    });
   };
 
   const stats = {
@@ -382,6 +424,17 @@ export default function PostsPage() {
     <div className="space-y-6">
       {/* Toast Notifications */}
       <ToastContainer toasts={toasts} removeToast={removeToast} />
+
+      {/* Confirmation Dialog */}
+      <ConfirmDialog
+        isOpen={confirmDialog.isOpen}
+        onClose={() => setConfirmDialog({ ...confirmDialog, isOpen: false })}
+        onConfirm={confirmDialog.onConfirm}
+        title={confirmDialog.title}
+        message={confirmDialog.message}
+        type={confirmDialog.type}
+        confirmText={confirmDialog.confirmText}
+      />
 
       {/* Real-Time Posting Progress - NEW */}
       {activeJobId && (

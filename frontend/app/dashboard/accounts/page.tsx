@@ -15,6 +15,7 @@ import {
 } from "lucide-react";
 import AddAccountModal from "@/components/AddAccountModal";
 import BulkUploadModal from "@/components/BulkUploadModal";
+import ConfirmDialog from "@/components/ui/ConfirmDialog";
 
 interface FacebookAccount {
   id: number;
@@ -34,6 +35,14 @@ export default function AccountsPage() {
   );
   const [selectedAccounts, setSelectedAccounts] = useState<number[]>([]);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [confirmDialog, setConfirmDialog] = useState({
+    isOpen: false,
+    title: "",
+    message: "",
+    type: "danger" as "danger" | "warning" | "success" | "info",
+    confirmText: "Confirm",
+    onConfirm: () => {},
+  });
 
   useEffect(() => {
     fetchAccounts();
@@ -53,55 +62,69 @@ export default function AccountsPage() {
   };
 
   const handleDelete = async (id: number) => {
-    if (!confirm("Are you sure you want to delete this account?")) return;
+    const accountToDelete = accounts.find((acc) => acc.id === id);
 
-    try {
-      await accountsAPI.delete(id);
-      setAccounts(accounts.filter((acc) => acc.id !== id));
-    } catch (err) {
-      alert("Failed to delete account");
-      console.error(err);
-    }
+    setConfirmDialog({
+      isOpen: true,
+      title: "Delete Account",
+      message: `Are you sure you want to delete the account "${
+        accountToDelete?.email || "this account"
+      }"? This action cannot be undone.`,
+      type: "danger",
+      confirmText: "Delete",
+      onConfirm: async () => {
+        try {
+          await accountsAPI.delete(id);
+          setAccounts(accounts.filter((acc) => acc.id !== id));
+        } catch (err) {
+          alert("Failed to delete account");
+          console.error(err);
+        }
+      },
+    });
   };
 
   const handleBulkDelete = async () => {
     if (selectedAccounts.length === 0) return;
 
-    if (
-      !confirm(
-        `Are you sure you want to delete ${selectedAccounts.length} account(s)?`
-      )
-    ) {
-      return;
-    }
+    setConfirmDialog({
+      isOpen: true,
+      title: "Delete Selected Accounts",
+      message: `Are you sure you want to delete ${selectedAccounts.length} account(s)? This action cannot be undone.`,
+      type: "danger",
+      confirmText: "Delete All",
+      onConfirm: async () => {
+        try {
+          setIsDeleting(true);
+          const deletePromises = selectedAccounts.map((id) =>
+            accountsAPI.delete(id)
+          );
+          const results = await Promise.allSettled(deletePromises);
 
-    try {
-      setIsDeleting(true);
-      const deletePromises = selectedAccounts.map((id) =>
-        accountsAPI.delete(id)
-      );
-      const results = await Promise.allSettled(deletePromises);
+          const successCount = results.filter(
+            (r) => r.status === "fulfilled"
+          ).length;
+          const failCount = results.filter(
+            (r) => r.status === "rejected"
+          ).length;
 
-      const successCount = results.filter(
-        (r) => r.status === "fulfilled"
-      ).length;
-      const failCount = results.filter((r) => r.status === "rejected").length;
+          if (successCount > 0) {
+            alert(`Successfully deleted ${successCount} account(s)`);
+            setSelectedAccounts([]);
+            fetchAccounts();
+          }
 
-      if (successCount > 0) {
-        alert(`Successfully deleted ${successCount} account(s)`);
-        setSelectedAccounts([]);
-        fetchAccounts();
-      }
-
-      if (failCount > 0) {
-        alert(`Failed to delete ${failCount} account(s)`);
-      }
-    } catch (err) {
-      alert("Failed to delete accounts");
-      console.error(err);
-    } finally {
-      setIsDeleting(false);
-    }
+          if (failCount > 0) {
+            alert(`Failed to delete ${failCount} account(s)`);
+          }
+        } catch (err) {
+          alert("Failed to delete accounts");
+          console.error(err);
+        } finally {
+          setIsDeleting(false);
+        }
+      },
+    });
   };
 
   const handleSelectAll = () => {
@@ -155,6 +178,17 @@ export default function AccountsPage() {
 
   return (
     <div className="space-y-6">
+      {/* Confirmation Dialog */}
+      <ConfirmDialog
+        isOpen={confirmDialog.isOpen}
+        onClose={() => setConfirmDialog({ ...confirmDialog, isOpen: false })}
+        onConfirm={confirmDialog.onConfirm}
+        title={confirmDialog.title}
+        message={confirmDialog.message}
+        type={confirmDialog.type}
+        confirmText={confirmDialog.confirmText}
+      />
+
       {/* Add Account Modal */}
       <AddAccountModal
         isOpen={isModalOpen}
