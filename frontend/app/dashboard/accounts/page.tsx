@@ -142,27 +142,53 @@ export default function AccountsPage() {
   };
 
   const handleUpdateSession = async (id: number) => {
-    try {
-      setUpdatingSessionId(id);
-      const response = await accountsAPI.updateSession(id);
-      alert(
-        response.data.message ||
-          "Browser opening for login. Please complete the login process."
-      );
-      // Refresh accounts after a delay to allow session update
-      setTimeout(() => {
-        fetchAccounts();
-        setUpdatingSessionId(null);
-      }, 3000);
-    } catch (err: unknown) {
-      const error = err as { response?: { data?: { error?: string } } };
-      alert(
-        error.response?.data?.error ||
-          "Failed to update session. Please try again."
-      );
-      setUpdatingSessionId(null);
-      console.error(err);
-    }
+    setConfirmDialog({
+      isOpen: true,
+      title: "Update Session",
+      message:
+        "This will open a browser window for you to log in to Facebook. The session will be saved once you complete the login. Continue?",
+      type: "info",
+      confirmText: "Continue",
+      onConfirm: async () => {
+        try {
+          setUpdatingSessionId(id);
+          const response = await accountsAPI.updateSession(id);
+          setConfirmDialog({
+            isOpen: true,
+            title: "Login Required",
+            message:
+              response.data.message ||
+              "Browser opening for login. Please complete the login process.",
+            type: "success",
+            confirmText: "OK",
+            onConfirm: () => {
+              setConfirmDialog((prev) => ({ ...prev, isOpen: false }));
+            },
+          });
+          // Refresh accounts after a delay to allow session update
+          setTimeout(() => {
+            fetchAccounts();
+            setUpdatingSessionId(null);
+          }, 3000);
+        } catch (err: unknown) {
+          const error = err as { response?: { data?: { error?: string } } };
+          setConfirmDialog({
+            isOpen: true,
+            title: "Update Failed",
+            message:
+              error.response?.data?.error ||
+              "Failed to update session. Please try again.",
+            type: "danger",
+            confirmText: "OK",
+            onConfirm: () => {
+              setConfirmDialog((prev) => ({ ...prev, isOpen: false }));
+            },
+          });
+          setUpdatingSessionId(null);
+          console.error(err);
+        }
+      },
+    });
   };
 
   if (loading) {
