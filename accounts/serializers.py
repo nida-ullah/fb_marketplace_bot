@@ -40,6 +40,8 @@ class RegisterSerializer(serializers.ModelSerializer):
 
 class FacebookAccountSerializer(serializers.ModelSerializer):
     session_exists = serializers.SerializerMethodField()
+    # Accept plain password in API
+    password = serializers.CharField(write_only=True)
 
     class Meta:
         model = FacebookAccount
@@ -52,3 +54,24 @@ class FacebookAccountSerializer(serializers.ModelSerializer):
         import os
         session_file = f"sessions/{obj.email.replace('@', '_').replace('.', '_')}.json"
         return os.path.exists(session_file)
+
+    def create(self, validated_data):
+        """Override create to encrypt password"""
+        password = validated_data.pop('password')
+        account = FacebookAccount(**validated_data)
+        account.set_password(password)  # Encrypt before saving
+        account.save()
+        return account
+
+    def update(self, instance, validated_data):
+        """Override update to encrypt password if provided"""
+        password = validated_data.pop('password', None)
+
+        for attr, value in validated_data.items():
+            setattr(instance, attr, value)
+
+        if password:
+            instance.set_password(password)  # Encrypt before saving
+
+        instance.save()
+        return instance

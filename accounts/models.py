@@ -1,6 +1,7 @@
 from django.db import models
 from django.contrib.auth.models import AbstractUser
 from django.conf import settings
+from .encryption import PasswordEncryption
 import os
 
 
@@ -61,12 +62,41 @@ class FacebookAccount(models.Model):
     user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE,
                              related_name='facebook_accounts', null=True, blank=True)
     email = models.EmailField()
-    password = models.CharField(max_length=255)  # Store securely in production
+    encrypted_password = models.TextField()  # Encrypted password storage
     session_cookie = models.TextField(blank=True, null=True)
     created_at = models.DateTimeField(auto_now_add=True)
 
     def __str__(self) -> str:
         return str(self.email)
+
+    def set_password(self, raw_password):
+        """
+        Encrypt and save password.
+
+        Args:
+            raw_password (str): Plain text password to encrypt
+        """
+        self.encrypted_password = PasswordEncryption.encrypt(raw_password)
+
+    def get_password(self):
+        """
+        Decrypt and return password.
+
+        Returns:
+            str: Decrypted plain text password
+        """
+        return PasswordEncryption.decrypt(self.encrypted_password)
+
+    @property
+    def password(self):
+        """
+        Property for backward compatibility.
+        Allows accessing password like: account.password
+
+        Returns:
+            str: Decrypted password
+        """
+        return self.get_password()
 
     def delete(self, *args, **kwargs):
         # Delete session file when account is deleted

@@ -24,6 +24,14 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 # SECURITY WARNING: keep the secret key used in production secret!
 SECRET_KEY = 'django-insecure-1dx!lqarz%+96k@cq=r_jmttnn)qw^w++spfkdhn)y4%jx58f-'
 
+# Facebook password encryption key
+# Generated using: python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
+# IMPORTANT: Keep this secret! Use environment variable in production
+FACEBOOK_PASSWORD_ENCRYPTION_KEY = os.environ.get(
+    'FB_PASSWORD_KEY',
+    'ea9l8USD4t8LOzTSDvfE3FVOOob4NHul3AYmgZ22drc='  # Development key
+)
+
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 

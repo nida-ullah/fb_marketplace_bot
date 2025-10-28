@@ -196,17 +196,19 @@ def add_facebook_account_with_login(request):
         )
 
     # Create account in database with user association
-    account = FacebookAccount.objects.create(
+    account = FacebookAccount(
         user=request.user,
-        email=email,
-        password=password
+        email=email
     )
+    account.set_password(password)  # Encrypt password before saving
+    account.save()
 
     # Start browser automation in background thread
     def automated_login():
         try:
             print(f"\n🌐 Opening browser for {email}...")
-            success = save_session(email, password)
+            # Use decrypted password
+            success = save_session(email, account.get_password())
             if success:
                 print(f"✅ Session saved successfully for {email}")
             else:
@@ -292,11 +294,13 @@ def bulk_upload_accounts_with_login(request):
                     continue
 
                 # Create account in database with user association
-                account = FacebookAccount.objects.create(
+                account = FacebookAccount(
                     user=request.user,
-                    email=email,
-                    password=password
+                    email=email
                 )
+                # Encrypt password before saving
+                account.set_password(password)
+                account.save()
                 accounts_created.append(email)
 
             except Exception as e:
@@ -312,7 +316,8 @@ def bulk_upload_accounts_with_login(request):
                     try:
                         account = FacebookAccount.objects.get(email=email)
                         print(f"\n🌐 Opening browser for {email}...")
-                        success = save_session(email, account.password)
+                        # Use decrypted password
+                        success = save_session(email, account.get_password())
                         if success:
                             print(f"✅ Session saved for {email}")
                         else:
@@ -360,7 +365,8 @@ def update_account_session(request, pk):
             try:
                 print(f"\n🔄 Update Session requested for: {account.email}")
                 print(f"🌐 Opening browser for re-login...")
-                success = save_session(account.email, account.password)
+                # Use decrypted password
+                success = save_session(account.email, account.get_password())
                 if success:
                     print(
                         f"✅ Session updated successfully for {account.email}")
